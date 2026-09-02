@@ -28,6 +28,21 @@ class MasterEditorMenu extends MusicBeatState
 
 	override function create()
 	{
+		#if MODS_ALLOWED
+		var hasMods:Bool = Mods.getModDirectories().length > 0;
+		#else
+		var hasMods:Bool = false;
+		#end
+		if(!hasMods)
+		{
+			FlxTransitionableState.skipNextTransIn = true;
+			persistentUpdate = false;
+			MusicBeatState.switchState(new states.ErrorState("NO MOD INSTALLED!\n\nPlease install a mod (put it in the mods/ folder),\n   then come back.\n\nPress A / B to go back to Main Menu.",
+				function() MusicBeatState.switchState(new states.MainMenuState()),
+				function() MusicBeatState.switchState(new states.MainMenuState())));
+			return;
+		}
+
 		FlxG.camera.bgColor = FlxColor.BLACK;
 		#if DISCORD_ALLOWED
 		// Updating Discord Rich Presence

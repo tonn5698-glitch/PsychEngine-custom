@@ -3,6 +3,7 @@ package states;
 import backend.WeekData;
 import backend.Highscore;
 import backend.Song;
+import backend.Mods;
 
 import objects.HealthIcon;
 import objects.MusicPlayer;
@@ -68,6 +69,21 @@ class FreeplayState extends MusicBeatState
 
 		final accept:String = (controls.mobileC) ? "A" : "ACCEPT";
 		final reject:String = (controls.mobileC) ? "B" : "BACK";
+
+		#if MODS_ALLOWED
+		var hasMods:Bool = Mods.getModDirectories().length > 0;
+		#else
+		var hasMods:Bool = false;
+		#end
+		if(!hasMods)
+		{
+			FlxTransitionableState.skipNextTransIn = true;
+			persistentUpdate = false;
+			MusicBeatState.switchState(new states.ErrorState("NO MOD INSTALLED!\n\nPlease install a mod (put it in the mods/ folder),\n   then come back.\n\nPress " + accept + " / " + reject + " to go back to Main Menu.",
+				function() MusicBeatState.switchState(new states.MainMenuState()),
+				function() MusicBeatState.switchState(new states.MainMenuState())));
+			return;
+		}
 
 		if(WeekData.weeksList.length < 1)
 		{
