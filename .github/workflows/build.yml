@@ -39,6 +39,14 @@ jobs:
         with:
           haxe-version: ${{ env.HAXE_VERSION }}
 
+      - name: Cache haxelib
+        uses: actions/cache@v4
+        with:
+          path: ~/haxelib
+          key: haxelib-${{ runner.os }}-${{ hashFiles('setup/unix.sh') }}
+          restore-keys: |
+            haxelib-${{ runner.os }}-
+
       - name: Setup Android NDK
         if: inputs.name == 'Android'
         id: setup-ndk
@@ -46,6 +54,7 @@ jobs:
         with:
           ndk-version: r27c
           add-to-path: false
+          cache: both
 
       - name: Install libVLC
         if: contains(inputs.name, 'Linux')
@@ -61,6 +70,24 @@ jobs:
           haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }}
           haxelib run lime config JAVA_HOME $JAVA_HOME_17_arm64
           haxelib run lime config ANDROID_SETUP true
+
+      - name: Cache hxcpp build objects
+        if: inputs.name == 'Android'
+        uses: actions/cache@v4
+        with:
+          path: export/release/android/obj
+          key: hxcpp-${{ runner.os }}-android-${{ hashFiles('setup/unix.sh') }}
+          restore-keys: |
+            hxcpp-${{ runner.os }}-android-
+
+      - name: Cache Gradle
+        if: inputs.name == 'Android'
+        uses: actions/cache@v4
+        with:
+          path: export/release/android/bin/.gradle
+          key: gradle-${{ runner.os }}-android
+          restore-keys: |
+            gradle-${{ runner.os }}-android
 
       - name: Compile
         run: haxelib run lime build ${{ inputs.buildArgs }}
