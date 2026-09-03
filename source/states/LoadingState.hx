@@ -171,6 +171,15 @@ class LoadingState extends MusicBeatState
 		funkay.updateHitbox();
 		addBehindBar(funkay);
 		#end
+
+		// P2: optional declarative loading-screen config (mods/<ModDir>/data/loadingScreen.json)
+		// Applied only when no valid LoadingScreen.hx override is active (hscript == null).
+		// Full override script wins over this config layer.
+		#if HSCRIPT_ALLOWED
+		if (hscript == null)
+		#end
+		applyLoadingScreenConfig(barBack, bar);
+
 		super.create();
 
 		if (stateChangeDelay <= 0 && checkLoaded())
@@ -178,6 +187,67 @@ class LoadingState extends MusicBeatState
 			dontUpdate = true;
 			onLoad();
 		}
+	}
+
+	// P2: declarative loading-screen config. Reads mods/<ModDir>/data/loadingScreen.json
+	// and overrides default-engine loading UI assets without touching load logic/threading.
+	function applyLoadingScreenConfig(barBack:FlxSprite, bar:FlxSprite)
+	{
+		if (Mods.currentModDirectory == null || Mods.currentModDirectory.trim().length < 1) return;
+
+		var cfgPath:String = 'mods/${Mods.currentModDirectory}/data/loadingScreen.json';
+		if (!FileSystem.exists(cfgPath)) return;
+
+		var config:Dynamic = null;
+		try { config = Json.parse(File.getContent(cfgPath)); } catch(e:Dynamic) {}
+		if (config == null) return;
+
+		try
+		{
+			if (Reflect.hasField(config, 'background') && config.background != null && config.background != '')
+			{
+				var bgCfg:FlxSprite = new FlxSprite().loadGraphic(Paths.image(Std.string(config.background)));
+				bgCfg.antialiasing = ClientPrefs.data.antialiasing;
+				bgCfg.setGraphicSize(Std.int(FlxG.width));
+				bgCfg.updateHitbox();
+				addBehindBar(bgCfg);
+			}
+
+			if (Reflect.hasField(config, 'barColor') && config.barColor != null)
+				bar.color = parseHexColor(config.barColor);
+
+			if (Reflect.hasField(config, 'barBackgroundColor') && config.barBackgroundColor != null)
+				barBack.color = parseHexColor(config.barBackgroundColor);
+
+			#if PSYCH_WATERMARKS
+			if (Reflect.hasField(config, 'text') && config.text != null)
+				loadingText.text = Std.string(config.text);
+
+			if (Reflect.hasField(config, 'logo'))
+			{
+				if (config.logo == null || config.logo == '') logo.visible = false;
+				else
+				{
+					logo.loadGraphic(Paths.image(Std.string(config.logo)));
+					logo.antialiasing = ClientPrefs.data.antialiasing;
+					logo.scale.set(0.75, 0.75);
+					logo.updateHitbox();
+					logo.screenCenter();
+					logo.x -= 50;
+					logo.y -= 40;
+				}
+			}
+			#end
+		}
+		catch(e:Dynamic) { trace('loadingScreen.json apply error: $e'); }
+	}
+
+	function parseHexColor(str:Dynamic):Int
+	{
+		var s:String = Std.string(str);
+		s = StringTools.replace(s, '#', '');
+		var v:Int = Std.parseInt('0x' + s);
+		return (v != null) ? v : 0xFFFFFF;
 	}
 
 	function addBehindBar(obj:flixel.FlxBasic)
@@ -328,6 +398,7 @@ class LoadingState extends MusicBeatState
 		loadMax = 0;
 		initialThreadCompleted = true;
 		isIntrusive = false;
+		clearRequiredManifest();
 
 		FlxTransitionableState.skipNextTransIn = true;
 		if (threadPool != null) threadPool.shutdown(); // kill all workers safely
@@ -345,7 +416,10 @@ class LoadingState extends MusicBeatState
 		requestedBitmaps.clear();
 		originalBitmapKeys.clear();
 		// trace('we checked if loaded');
-		return (loaded >= loadMax && initialThreadCompleted);
+		// P1: counter check (now mutex-protected) AND real manifest verification
+		// must BOTH pass before we allow the switch. This prevents "loaded a bunch
+		// of things but not the ones the song actually needs" (muc 6.4).
+		return (loaded >= loadMax && initialThreadCompleted && verifyManifestLoaded());
 	}
 
 	public static function loadNextDirectory()
@@ -402,6 +476,39 @@ class LoadingState extends MusicBeatState
 
 	static var initialThreadCompleted:Bool = true;
 	static var dontPreloadDefaultVoices:Bool = false;
+
+	// P1: real-loading-gate manifest. Worker loaders append the ACTUAL cache keys
+	// they populated (no re-deriving paths), and checkLoaded() verifies every one
+	// of them really exists in the Paths caches before allowing the state switch.
+	static var requiredImageKeys:Array<String> = [];
+	static var requiredSoundKeys:Array<String> = [];
+
+	static function clearRequiredManifest()
+	{
+		requiredImageKeys = [];
+		requiredSoundKeys = [];
+	}
+
+	// P1: returns true only when EVERY asset that was actually scheduled for load
+	// ended up in the Paths caches. Runs AFTER the cacheBitmap() loop in checkLoaded().
+	static function verifyManifestLoaded():Bool
+	{
+		for (key in requiredImageKeys)
+			if (!Paths.currentTrackedAssets.exists(key))
+			{
+				trace('verifyManifestLoaded: image missing from cache: $key');
+				return false;
+			}
+
+		for (key in requiredSoundKeys)
+			if (!Paths.currentTrackedSounds.exists(key))
+			{
+				trace('verifyManifestLoaded: sound missing from cache: $key');
+				return false;
+			}
+
+		return true;
+	}
 	static function _startPool()
 	{
 		#if MULTITHREADED_LOADING
@@ -434,12 +541,16 @@ class LoadingState extends MusicBeatState
 		musicToPrepare = [];
 		songsToPrepare = [];
 
+		// P0: make sure the mutex exists before any worker thread calls completedThread()
+		if (mutex == null) mutex = new Mutex();
 		initialThreadCompleted = false;
 		var threadsCompleted:Int = 0;
 		var threadsMax:Int = 0;
 		function completedThread()
 		{
+			mutex.acquire();
 			threadsCompleted++;
+			mutex.release();
 			if(threadsCompleted == threadsMax)
 			{
 				clearInvalids();
@@ -653,7 +764,11 @@ class LoadingState extends MusicBeatState
 
 	public static function startThreads()
 	{
-		mutex = new Mutex();
+		// P0: keep the mutex created by prepareToSong() so completedThread() and
+		// loaded++ in worker threads share the SAME mutex for the whole load cycle.
+		if (mutex == null) mutex = new Mutex();
+		// P1: reset the real-loading-gate manifest for this load cycle.
+		clearRequiredManifest();
 		loadMax = imagesToPrepare.length + soundsToPrepare.length + musicToPrepare.length + songsToPrepare.length;
 		loaded = 0;
 
@@ -695,9 +810,11 @@ class LoadingState extends MusicBeatState
 			catch(e:Dynamic) {
 				trace('ERROR! fail on preloading $traceData: $e');
 			}
-			// mutex.acquire();
+			// P0: protect `loaded` from lost updates when multiple worker threads
+			// finish at the same time (previously the mutex lines were commented out).
+			if (mutex != null) mutex.acquire();
 			loaded++;
-			// mutex.release();
+			if (mutex != null) mutex.release();
 		});
 	}
 
@@ -770,22 +887,32 @@ class LoadingState extends MusicBeatState
 			if (#if sys FileSystem.exists(file) || #end OpenFlAssets.exists(file, SOUND))
 			{
 				var sound:Sound = #if sys Sound.fromFile(file) #else OpenFlAssets.getSound(file, false) #end;
-				mutex.acquire();
+				if (mutex != null) mutex.acquire();
 				Paths.currentTrackedSounds.set(file, sound);
-				mutex.release();
+				if (mutex != null) mutex.release();
 			}
 			else if (beepOnNull)
 			{
 				trace('SOUND NOT FOUND: $key, PATH: $path');
 				FlxG.log.error('SOUND NOT FOUND: $key, PATH: $path');
-				return FlxAssets.getSound('flixel/sounds/beep');
+				// P3: still cache the fallback beep under this file's key so the
+				// real-loading-gate manifest check passes (no infinite loading).
+				var fallback:Sound = FlxAssets.getSound('flixel/sounds/beep');
+				if (mutex != null) mutex.acquire();
+				Paths.currentTrackedSounds.set(file, fallback);
+				if (mutex != null) mutex.release();
+				return fallback;
 			}
 		}
-		mutex.acquire();
+		if (mutex != null) mutex.acquire();
 		Paths.localTrackedAssets.push(file);
-		mutex.release();
+		// P1: record ONLY when the sound is actually present in the cache, so a
+		// missing/unloadable sound can't wedge the real-loading gate forever.
+		if (Paths.currentTrackedSounds.exists(file) && !requiredSoundKeys.contains(file))
+			requiredSoundKeys.push(file);
+		if (mutex != null) mutex.release();
 
-		return Paths.currentTrackedSounds.get(file);
+		return Paths.currentTrackedSounds.exists(file) ? Paths.currentTrackedSounds.get(file) : null;
 	}
 
 	// thread safe sound loader
@@ -807,13 +934,32 @@ class LoadingState extends MusicBeatState
 					var bitmap:BitmapData = OpenFlAssets.getBitmapData(file, false);
 					#end
 
-					mutex.acquire();
+					if (mutex != null) mutex.acquire();
+					if (!requiredImageKeys.contains(requestKey)) requiredImageKeys.push(requestKey);
 					requestedBitmaps.set(file, bitmap);
 					originalBitmapKeys.set(file, requestKey);
-					mutex.release();
+					if (mutex != null) mutex.release();
 					return bitmap;
 				}
-				else trace('no such image $key exists');
+				else
+				{
+					// P3: placeholder so a missing image never leaves the real-loading
+					// gate waiting forever on a cache entry that will never appear.
+					trace('no such image $key exists, using placeholder');
+					var placeholder:BitmapData = new BitmapData(1, 1, true, 0x00FFFFFF);
+					if (mutex != null) mutex.acquire();
+					if (!requiredImageKeys.contains(requestKey)) requiredImageKeys.push(requestKey);
+					requestedBitmaps.set(file, placeholder);
+					originalBitmapKeys.set(file, requestKey);
+					if (mutex != null) mutex.release();
+					return placeholder;
+				}
+			}
+			else
+			{
+				if (mutex != null) mutex.acquire();
+				if (!requiredImageKeys.contains(requestKey)) requiredImageKeys.push(requestKey);
+				if (mutex != null) mutex.release();
 			}
 
 			return Paths.currentTrackedAssets.get(requestKey).bitmap;

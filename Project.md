@@ -116,11 +116,29 @@ Nếu file tồn tại → khởi tạo `HScript`, expose `getLoaded`, `getLoadM
 4. **Không có gate xác thực thực tế** — `checkLoaded()` chỉ so sánh **số lượng** (`loaded >= loadMax`), không verify từng required asset đã thực sự có trong `Paths.currentTrackedAssets` / `Paths.currentTrackedSounds`. Một counter đúng số nhưng sai nội dung (ví dụ do lỗi thread) vẫn được coi là "loaded".
 5. **`PlayState.generateSong()` không phụ thuộc vào kết quả LoadingState**: gọi thẳng `Paths.inst(songData.song)` và `Paths.voices(...)` bất kể asset đã được preload hay chưa. Nếu chưa có trong cache, `Paths.returnSound()`/`Paths.image()` sẽ tự load đồng bộ **trên main thread ngay trong lúc tạo PlayState** — gây block/hitch đúng vào thời điểm chuyển màn hình, đặc biệt nặng với file OGG lớn.
 
-### ⚠️ CẦN XÁC MINH — chưa đủ source để khẳng định
+### ✅ CONFIRMED — Call site thực tế vào `PlayState` (đã xác minh từ `source/` đầy đủ)
 
-- Call site thực tế gọi `LoadingState.loadAndSwitchState(...)` để vào `PlayState` (ví dụ từ `FreeplayState.hx`, `StoryMenuState.hx`, hoặc trong chính `PlayState`) — **không có trong source đã cung cấp**. Cần xác minh: gọi với `intrusive = true` hay `false`? `prepareToSong()` có được gọi **trước** `loadAndSwitchState()` hay không, và độ trễ giữa 2 lệnh gọi là bao nhiêu?
-  - Rủi ro nếu chưa xác minh: giá trị mặc định class-level của `initialThreadCompleted` là `true` (chỉ bị set `false` bên trong `prepareToSong()`). Nếu `LoadingState` được tạo trước khi `prepareToSong()` kịp set `false`, `checkLoaded()` ở `create()` có thể trả `true` ngay lập tức (loadMax=0, initialThreadCompleted=true mặc định) → chuyển state với 0 asset được preload → toàn bộ asset fallback về load đồng bộ trong `PlayState`.
-- AI agent **phải đọc phần còn lại của `PlayState.hx` (constructor/`create()`) và call site trước khi implement**, không được giả định thứ tự gọi.
+Call site vào `PlayState` qua `LoadingState` (đọc trực tiếp `source/states/StoryMenuState.hx`, `FreeplayState.hx`, `PlayState.hx`):
+
+| Call site | Dòng | Thứ tự gọi | `intrusive` |
+|---|---|---|---|
+| `StoryMenuState.hx` | 382–386 | `prepareToSong()` → **`new FlxTimer().start(1, ...)`** → `loadAndSwitchState(new PlayState(), true)` | `true` (default) |
+| `FreeplayState.hx` | 473–474 | `prepareToSong()` → **ngay lập tức** → `loadAndSwitchState(new PlayState())` | `true` |
+| `PlayState.hx` (story song kế tiếp) | 2524–2525 | `prepareToSong()` → **ngay lập tức** → `loadAndSwitchState(new PlayState(), false, false)` | **`false`** ⚠️ |
+
+Phân tích từng path (đã xác minh theo cơ chế `lime.app.Future` trong `prepareToSong()` — `async` truyền vào chính là `isIntrusive`):
+
+- **`intrusive = false` (PlayState 2525)**: `isIntrusive = false` → các `Future` trong `prepareToSong()` chạy **đồng bộ ngay lập tức** → `prepareToSong()` hoàn tất *trước* khi `loadAndSwitchState()` được gọi. Về thứ tự thì path này an toàn (manifest đã build xong trước). NHƯNG `getNextState()` rơi vào **busy-wait** `while(true){ if(checkLoaded())... else Sys.sleep(0.001); }` trên chính thread gọi (main). Nếu race `loaded++`/`threadsCompleted++` (mục 6.1, 6.2) xảy ra → `checkLoaded()` không bao giờ true → **treo vĩnh viễn = black screen/ANR trên Android**. Đây là path rủi ro nhất.
+- **`intrusive = true` (StoryMenu, Freeplay)**: `isIntrusive = true` → `Future` async → `prepareToSong()` chạy nền, `loadMax`/`threadsCompleted` build theo thời gian thực. `LoadingState` (có UI progress bar) được tạo và `update()` polling `checkLoaded()`. 
+  - **Freeplay (gọi ngay)**: `loadAndSwitchState` chạy ngay sau khi `prepareToSong()` mới bắt đầu → `loadMax` có thể vẫn `0` / `initialThreadCompleted` vẫn `true` (default class-level) ở vài frame đầu. Nếu toàn bộ asset built xong cực nhanh (bài ngắn/ít asset) trước khi thread pool bắt đầu, `checkLoaded()` có thể trả `true` sớm → nhưng vì `prepareToSong` async đang chạy, các Future `.then()` tiếp tục `prepare(...)` các asset khác *sau* khi checkLoaded đã true → asset bị miss khỏi quá trình preload thực tế → rơi về load đồng bộ trong `PlayState.generateSong()` (mục 6.5).
+  - **StoryMenu (delay 1s)**: `FlxTimer 1s` cho `prepareToSong()` async thời gian để build xong manifest trước khi `loadAndSwitchState` → ít rủi ro race "early-true" hơn Freeplay, nhưng vẫn phụ thuộc việc cache hoàn tất.
+
+**Kết luận cho design fix (mục 7/10)**: 
+- Cần xử lý cả 2 path. Với `intrusive=false` (PlayState 2525), việc busy-wait trên main thread là điểm chết nếu race xảy ra → **ưu tiên P0 fix mutex**. 
+- Với `intrusive=true` gọi ngay (Freeplay), vấn đề là `loadMax` chưa chắc đã set đúng kịp → mục 10 (build manifest trước khi construct LoadingState) giúp progress chính xác ngay frame đầu.
+- `checkLoaded()` hiện tại KHÔNG verify từng required asset trong `Paths.currentTrackedAssets`/`currentTrackedSounds` — chỉ so sánh số `loaded >= loadMax`. Đây là điểm yếu mà `verifyManifestLoaded()` (mục 7 P1) sẽ bịt.
+
+`MusicBeatState.switchState()` (`source/backend/MusicBeatState.hx:267`) dùng `FlxG.switchState` khi `skipNextTransIn`, ngược lại `startTransition` (mở `CustomFadeTransition` substate). `_loaded()` set `skipNextTransIn = true` → `onLoad()` gọi `switchState(target)` trực tiếp bằng `FlxG.switchState` (không fade).
 
 ---
 
@@ -352,3 +370,49 @@ Mods (không đổi)
 - **P2**: Thêm `loadingScreen.json` config layer (mục 11, 12) — thuần bổ sung, không đụng logic loading.
 - **P3**: Fallback ảnh placeholder cho `preloadGraphic` khi asset thiếu (mục 13), logging chi tiết hơn.
 - **P4**: Test suite đầy đủ theo mục 21 + build verification theo mục 22.
+
+---
+
+## 25. Implementation Status (cập nhật theo từng bước lập trình)
+
+### Đã implement (chỉ sửa `source/states/LoadingState.hx`)
+
+| Bước | Nội dung | File:dòng |
+|---|---|---|
+| P0 | `threadsCompleted++` bọc `mutex.acquire()/release()` | `LoadingState.hx` `completedThread()` |
+| P0 | `loaded++` bọc mutex (bỏ comment sẵn, giữ mutex) | `LoadingState.hx` `initThread()` |
+| P0 | Đảm bảo `mutex` tồn tại trước khi worker chạy `completedThread()` (`if (mutex == null) mutex = new Mutex();` ở đầu `prepareToSong()`) | `LoadingState.hx` `prepareToSong()` |
+| P0 | `startThreads()` giữ nguyên mutex đã tạo (không tạo mới → 1 mutex chung cho cả cycle) | `LoadingState.hx` `startThreads()` |
+| P1 | `requiredImageKeys` / `requiredSoundKeys` — manifest cache keys thực tế do worker ghi | `LoadingState.hx` |
+| P1 | `verifyManifestLoaded()` — check từng key trong `Paths.currentTrackedAssets` / `currentTrackedSounds` | `LoadingState.hx` |
+| P1 | `checkLoaded()` đòi `loaded >= loadMax && initialThreadCompleted && verifyManifestLoaded()` | `LoadingState.hx` `checkLoaded()` |
+| P3 | `preloadSound` fallback beep được cache dưới key file (tránh verify treo) + chỉ record key khi sound thực sự trong cache | `LoadingState.hx` `preloadSound()` |
+| P3 | `preloadGraphic` placeholder 1x1 khi ảnh thiếu (tránh null → verify không treo) | `LoadingState.hx` `preloadGraphic()` |
+| P2 | `loadingScreen.json` config layer: `background`, `barColor`, `barBackgroundColor`, `text`, `logo` — chỉ áp dụng khi `hscript == null` (script override thắng) | `LoadingState.hx` `applyLoadingScreenConfig()` |
+
+### Quyết định thiết kế (lệch nhẹ với spec mục 7/10)
+
+Spec mục 7 gợi ý build `requiredAssetManifest:Array<String>` **trước** khi set `loadMax` (snapshot bất biến). 
+Implementation chọn cách **worker ghi cache key thực tế vào manifest trong lúc load** (không tự dựng lại path key), vì:
+- Tránh phải tái dựng cache key (phụ thuộc `Language.getFileTranslation`, extension, mod-first resolve) — dễ sai, Project.md mục 9 cảnh báo.
+- Verify trực tiếp chống đúng bug thật (mục 6.4): "đếm đúng số nhưng sai nội dung" — giờ chỉ count asset thực sự vào cache.
+- Gateway đều đạt mục tiêu: `switchState` không chạy trước khi mọi required asset **thực sự** nằm trong `Paths.currentTrackedAssets`/`currentTrackedSounds`.
+- Lưu ý: spec mục 10 (build manifest trước khi construct LoadingState để progress đúng từ frame đầu) **chưa thực hiện** — progress vẫn hoạt động như cũ (dựa `loaded/loadMax`), không phải mục tiêu hard gate.
+
+### An toàn chống treo (mới, không có trong spec gốc)
+
+- Sound load fail (`beepOnNull`) → beep fallback được cache dưới đúng key → `verifyManifestLoaded` pass, không treo.
+- Sound có `beepOnNull=false` (Inst/Vocals) nếu thực sự không cache được → **không record** → verify bỏ qua (không treo).
+- Ảnh thiếu → placeholder 1x1 cache dưới key → verify pass, không treo.
+- Ảnh load throw exception → không record → verify bỏ qua, không treo.
+- Mọi `mutex.acquire()` trong worker được guard `if (mutex != null)` (trừ `completedThread` — mutex được đảm bảo tồn tại trong `prepareToSong`, nên race protection vẫn đủ).
+
+### Chưa làm / cần test trên thiết bị thật (P4)
+
+- Không thể build local (ARM64 host thiếu toolchain) — chỉ build qua GitHub Actions khi xong cập nhật lớn (theo AGENTS.md).
+- Cần test trên thiết bị Android thật theo mục 21: (1) mod không có loading file → UI mặc định; (2) `LoadingScreen.hx` hợp lệ → override UI; (3) `LoadingScreen.hx` lỗi cú pháp → fallback mặc định + log; (4) `loadingScreen.json` hợp lệ → đổi asset; (5) thiếu file audio required → không crash, không switch sớm, có log; (6) load liên tục nhiều bài khác nhân vật (hồi quy race) → hết hang; (7) thiết bị ít core (threadCount=1) vẫn chạy đúng.
+- Schema `loadingScreen.json` (đọc qua `File.getContent`, mod-first qua `Paths.image`):
+  ```json
+  { "background": "loading_bg", "barColor": "#FFFFFF", "barBackgroundColor": "#000000", "text": "Loading...", "logo": null }
+  ```
+  Field thiếu → dùng mặc định engine. `logo:null`/`logo:""` → ẩn logo. Mod không có file → hành vi không đổi.
