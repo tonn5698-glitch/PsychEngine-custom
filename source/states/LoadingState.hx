@@ -246,7 +246,7 @@ class LoadingState extends MusicBeatState
 	{
 		var s:String = Std.string(str);
 		s = StringTools.replace(s, '#', '');
-		var v:Int = Std.parseInt('0x' + s);
+		var v:Null<Int> = Std.parseInt('0x' + s);
 		return (v != null) ? v : 0xFFFFFF;
 	}
 
