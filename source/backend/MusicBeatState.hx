@@ -5,7 +5,7 @@ import backend.PsychCamera;
 import backend.Mods;
 import psychlua.LuaUtils;
 #if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-import psychlua.GlobalScript;
+import psychlua.PsychGlobalScript;
 #end
 #if LUA_ALLOWED
 import psychlua.FunkinLua;
@@ -155,8 +155,8 @@ class MusicBeatState extends FlxState
 		#if MODS_ALLOWED Mods.updatedOnState = false; #end
 
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		GlobalScript.init();
-		GlobalScript.notifyStateSwitch(Type.getClassName(Type.getClass(this)));
+		PsychGlobalScript.init();
+		PsychGlobalScript.notifyStateSwitch(Type.getClassName(Type.getClass(this)));
 		#end
 
 		if(!_psychCameraInitialized) initPsychCamera();
@@ -184,7 +184,7 @@ class MusicBeatState extends FlxState
 	override function update(elapsed:Float)
 	{
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		if (GlobalScript.instance != null) GlobalScript.instance.callOnScripts('onUpdate', [elapsed]);
+		if (PsychGlobalScript.instance != null) PsychGlobalScript.instance.callOnScripts('onUpdate', [elapsed]);
 		#end
 		//everyStep();
 		var oldStep:Int = curStep;

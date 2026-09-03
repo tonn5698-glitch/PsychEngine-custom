@@ -1,9 +1,9 @@
 package psychlua;
 
 #if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-class GlobalScript
+class PsychGlobalScript
 {
-	public static var instance:GlobalScript;
+	public static var instance:PsychGlobalScript;
 
 	#if LUA_ALLOWED public var luaArray:Array<FunkinLua> = []; #end
 	#if HSCRIPT_ALLOWED public var hscriptArray:Array<HScript> = []; #end
@@ -12,9 +12,11 @@ class GlobalScript
 	public static function init()
 	{
 		if (instance != null) return;
-		instance = new GlobalScript();
+		instance = new PsychGlobalScript();
 		instance.loadScripts();
 	}
+
+	public function new() {}
 
 	function loadScripts()
 	{

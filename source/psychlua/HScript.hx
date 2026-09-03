@@ -309,8 +309,8 @@ class HScript extends Iris
 						Lua_helper.add_callback(script.lua, name, func);
 
 			#if LUA_ALLOWED
-			if (GlobalScript.instance != null)
-				for (script in GlobalScript.instance.luaArray)
+			if (PsychGlobalScript.instance != null)
+				for (script in PsychGlobalScript.instance.luaArray)
 					if(script != null && script.lua != null && !script.closed)
 						Lua_helper.add_callback(script.lua, name, func);
 			#end
