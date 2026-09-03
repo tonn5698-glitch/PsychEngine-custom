@@ -78,26 +78,22 @@ class ModState extends backend.MusicBeatState
 	function callLifecycle(func:String, ?args:Array<Dynamic>)
 		callOnScripts(func, args);
 
-	public static function switchState(nextState:FlxState = null)
-		backend.MusicBeatState.switchState(nextState);
-
 	function findScript():String
 	{
-		var path = 'data/states/$scriptName.hx';
+		var path:String = 'data/states/$scriptName.hx';
 		#if MODS_ALLOWED
-		// mod đang bật trước
-		var modPath = backend.Mods.currentModDirectory != null && backend.Mods.currentModDirectory.length > 0
+		var modPath:String = backend.Mods.currentModDirectory != null && backend.Mods.currentModDirectory.length > 0
 			? backend.Paths.mods(backend.Mods.currentModDirectory + '/' + path) : null;
 		if (modPath != null && sys.FileSystem.exists(modPath)) return modPath;
-		var mainModPath = backend.Paths.mods(path);
+		var mainModPath:String = backend.Paths.mods(path);
 		if (sys.FileSystem.exists(mainModPath)) return mainModPath;
 		for (mod in backend.Mods.getGlobalMods())
 		{
-			var p = backend.Paths.mods(mod + '/' + path);
+			var p:String = backend.Paths.mods(mod + '/' + path);
 			if (sys.FileSystem.exists(p)) return p;
 		}
 		#end
-		var shared = backend.Paths.getSharedPath(path);
+		var shared:String = backend.Paths.getSharedPath(path);
 		#if MODS_ALLOWED
 		if (sys.FileSystem.exists(shared)) return shared;
 		#else
@@ -106,6 +102,6 @@ class ModState extends backend.MusicBeatState
 		return null;
 	}
 
-	public static function open(tên:String, ?data:Dynamic)
-		backend.MusicBeatState.switchState(new ModState(tên, data));
+	public static function open(_stateName:String, ?_data:Dynamic)
+		backend.MusicBeatState.switchState(new ModState(_stateName, _data));
 }
