@@ -4,6 +4,9 @@ import flixel.FlxState;
 import backend.PsychCamera;
 import backend.Mods;
 import psychlua.LuaUtils;
+#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+import psychlua.GlobalScript;
+#end
 #if LUA_ALLOWED
 import psychlua.FunkinLua;
 #end
@@ -151,6 +154,11 @@ class MusicBeatState extends FlxState
 		var skip:Bool = FlxTransitionableState.skipNextTransOut;
 		#if MODS_ALLOWED Mods.updatedOnState = false; #end
 
+		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+		GlobalScript.init();
+		GlobalScript.notifyStateSwitch(Type.getClassName(Type.getClass(this)));
+		#end
+
 		if(!_psychCameraInitialized) initPsychCamera();
 
 		super.create();
@@ -175,6 +183,9 @@ class MusicBeatState extends FlxState
 	public static var timePassedOnState:Float = 0;
 	override function update(elapsed:Float)
 	{
+		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+		if (GlobalScript.instance != null) GlobalScript.instance.callOnScripts('onUpdate', [elapsed]);
+		#end
 		//everyStep();
 		var oldStep:Int = curStep;
 		timePassedOnState += elapsed;

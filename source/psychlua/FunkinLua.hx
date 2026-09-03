@@ -1603,6 +1603,8 @@ class FunkinLua {
 		ExtraFunctions.implement(this);
 		CustomSubstate.implement(this);
 		CustomStateFunctions.implement(this);
+		CustomFreeplayFunctions.implement(this);
+		CustomMenuFunctions.implement(this);
 		ShaderFunctions.implement(this);
 		DeprecatedFunctions.implement(this);
 		MobileFunctions.implement(this);

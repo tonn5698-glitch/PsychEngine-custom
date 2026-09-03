@@ -302,9 +302,18 @@ class HScript extends Iris
 		#if LUA_ALLOWED
 		set('createGlobalCallback', function(name:String, func:Dynamic)
 		{
-			for (script in PlayState.instance.luaArray)
-				if(script != null && script.lua != null && !script.closed)
-					Lua_helper.add_callback(script.lua, name, func);
+			var currentState:MusicBeatState = MusicBeatState.getState();
+			if (currentState != null)
+				for (script in currentState.luaArray)
+					if(script != null && script.lua != null && !script.closed)
+						Lua_helper.add_callback(script.lua, name, func);
+
+			#if LUA_ALLOWED
+			if (GlobalScript.instance != null)
+				for (script in GlobalScript.instance.luaArray)
+					if(script != null && script.lua != null && !script.closed)
+						Lua_helper.add_callback(script.lua, name, func);
+			#end
 
 			FunkinLua.customFunctions.set(name, func);
 		});

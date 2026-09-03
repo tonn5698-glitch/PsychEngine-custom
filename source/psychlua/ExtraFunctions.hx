@@ -105,51 +105,51 @@ class ExtraFunctions
 		Lua_helper.add_callback(lua, "keyJustPressed", function(name:String = '') {
 			name = name.toLowerCase().trim();
 			switch(name) {
-				case 'left': return PlayState.instance.controls.NOTE_LEFT_P;
-				case 'down': return PlayState.instance.controls.NOTE_DOWN_P;
-				case 'up': return PlayState.instance.controls.NOTE_UP_P;
-				case 'right': return PlayState.instance.controls.NOTE_RIGHT_P;
+				case 'left': return Controls.instance.NOTE_LEFT_P;
+				case 'down': return Controls.instance.NOTE_DOWN_P;
+				case 'up': return Controls.instance.NOTE_UP_P;
+				case 'right': return Controls.instance.NOTE_RIGHT_P;
 				case 'space':
 					var mobileShit:Bool = false;
 					if (Controls.instance.mobileC)
 						if (MusicBeatState.getState().mobileControls != null)
 							mobileShit = MusicBeatState.getState().mobileControls.buttonExtra.justPressed;
-					return PlayState.instance.controls.justPressed('space') || mobileShit;
-				default: return PlayState.instance.controls.justPressed(name);
+					return Controls.instance.justPressed('space') || mobileShit;
+				default: return Controls.instance.justPressed(name);
 			}
 			return false;
 		});
 		Lua_helper.add_callback(lua, "keyPressed", function(name:String = '') {
 			name = name.toLowerCase().trim();
 			switch(name) {
-				case 'left': return PlayState.instance.controls.NOTE_LEFT;
-				case 'down': return PlayState.instance.controls.NOTE_DOWN;
-				case 'up': return PlayState.instance.controls.NOTE_UP;
-				case 'right': return PlayState.instance.controls.NOTE_RIGHT;
+				case 'left': return Controls.instance.NOTE_LEFT;
+				case 'down': return Controls.instance.NOTE_DOWN;
+				case 'up': return Controls.instance.NOTE_UP;
+				case 'right': return Controls.instance.NOTE_RIGHT;
 				case 'space':
 					var mobileShit:Bool = false;
 					if (Controls.instance.mobileC)
 						if (MusicBeatState.getState().mobileControls != null)
 							mobileShit = MusicBeatState.getState().mobileControls.buttonExtra.pressed;
-					return PlayState.instance.controls.pressed('space') || mobileShit;
-				default: return PlayState.instance.controls.pressed(name);
+					return Controls.instance.pressed('space') || mobileShit;
+				default: return Controls.instance.pressed(name);
 			}
 			return false;
 		});
 		Lua_helper.add_callback(lua, "keyReleased", function(name:String = '') {
 			name = name.toLowerCase().trim();
 			switch(name) {
-				case 'left': return PlayState.instance.controls.NOTE_LEFT_R;
-				case 'down': return PlayState.instance.controls.NOTE_DOWN_R;
-				case 'up': return PlayState.instance.controls.NOTE_UP_R;
-				case 'right': return PlayState.instance.controls.NOTE_RIGHT_R;
+				case 'left': return Controls.instance.NOTE_LEFT_R;
+				case 'down': return Controls.instance.NOTE_DOWN_R;
+				case 'up': return Controls.instance.NOTE_UP_R;
+				case 'right': return Controls.instance.NOTE_RIGHT_R;
 				case 'space':
 					var mobileShit:Bool = false;
 					if (Controls.instance.mobileC)
 						if (MusicBeatState.getState().mobileControls != null)
 							mobileShit = MusicBeatState.getState().mobileControls.buttonExtra.justReleased;
-					return PlayState.instance.controls.justReleased('space') || mobileShit;
-				default: return PlayState.instance.controls.justReleased(name);
+					return Controls.instance.justReleased('space') || mobileShit;
+				default: return Controls.instance.justReleased(name);
 			}
 			return false;
 		});
