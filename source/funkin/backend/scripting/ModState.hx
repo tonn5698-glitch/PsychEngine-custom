@@ -31,10 +31,15 @@ class ModState extends backend.MusicBeatState
 
 		#if HSCRIPT_ALLOWED
 		var file:String = findScript();
+		trace('[ModState] create state=' + scriptName + ' scriptFile=' + file);
 		if (file != null)
 		{
-			trace('[ModState] load script: $file');
+			trace('[ModState] load script: ' + file);
 			initHScript(file);
+		}
+		else
+		{
+			trace('[ModState] WARNING: không tìm thấy data/states/$scriptName.hx trong mods/');
 		}
 		#end
 
@@ -81,18 +86,23 @@ class ModState extends backend.MusicBeatState
 	function findScript():String
 	{
 		var path:String = 'data/states/$scriptName.hx';
+
 		#if MODS_ALLOWED
-		var modPath:String = backend.Mods.currentModDirectory != null && backend.Mods.currentModDirectory.length > 0
-			? backend.Paths.mods(backend.Mods.currentModDirectory + '/' + path) : null;
-		if (modPath != null && sys.FileSystem.exists(modPath)) return modPath;
-		var mainModPath:String = backend.Paths.mods(path);
-		if (sys.FileSystem.exists(mainModPath)) return mainModPath;
+		// 1) Quét mọi thư mục mod có trong mods/ (kể cả không phải current)
+		for (mod in backend.Mods.getModDirectories())
+		{
+			var p:String = backend.Paths.mods(mod + '/' + path);
+			if (sys.FileSystem.exists(p)) return p;
+		}
+		// 2) Fallback: global mods
 		for (mod in backend.Mods.getGlobalMods())
 		{
 			var p:String = backend.Paths.mods(mod + '/' + path);
 			if (sys.FileSystem.exists(p)) return p;
 		}
 		#end
+
+		// 3) Game gốc (shared asset — hiếm khi có trên Android)
 		var shared:String = backend.Paths.getSharedPath(path);
 		#if MODS_ALLOWED
 		if (sys.FileSystem.exists(shared)) return shared;
