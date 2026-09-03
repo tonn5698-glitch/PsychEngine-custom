@@ -68,8 +68,13 @@ class FunkinLua {
 		//LuaL.dostring(lua, CLENSE);
 
 		this.scriptName = scriptName.trim();
-		var game:PlayState = PlayState.instance;
-		if(game != null) game.luaArray.push(this);
+
+		var currentState:backend.MusicBeatState = Std.isOfType(FlxG.state, backend.MusicBeatState)
+			? cast FlxG.state
+			: null;
+		if(currentState != null) currentState.luaArray.push(this);
+
+		var game:PlayState = Std.isOfType(currentState, PlayState) ? cast currentState : null;
 
 		var myFolder:Array<String> = this.scriptName.split('/');
 		#if MODS_ALLOWED
@@ -88,20 +93,42 @@ class FunkinLua {
 		set('version', MainMenuState.psychEngineVersion.trim());
 		set('modFolder', this.modFolder);
 
-		// Song/Week shit
-		set('curBpm', Conductor.bpm);
-		set('bpm', PlayState.SONG.bpm);
-		set('scrollSpeed', PlayState.SONG.speed);
-		set('crochet', Conductor.crochet);
-		set('stepCrochet', Conductor.stepCrochet);
-		set('songLength', FlxG.sound.music.length);
-		set('songName', PlayState.SONG.song);
-		set('songPath', Paths.formatToSongPath(PlayState.SONG.song));
-		set('loadedSongName', Song.loadedSongName);
-		set('loadedSongPath', Paths.formatToSongPath(Song.loadedSongName));
-		set('chartPath', Song.chartPath);
-		set('startedCountdown', false);
-		set('curStage', PlayState.SONG.stage);
+		// Song/Week shit — chỉ có giá trị thật khi đang ở trong PlayState
+		if(PlayState.SONG != null)
+		{
+			set('curBpm', Conductor.bpm);
+			set('bpm', PlayState.SONG.bpm);
+			set('scrollSpeed', PlayState.SONG.speed);
+			set('crochet', Conductor.crochet);
+			set('stepCrochet', Conductor.stepCrochet);
+			set('songLength', FlxG.sound.music != null ? FlxG.sound.music.length : 0);
+			set('songName', PlayState.SONG.song);
+			set('songPath', Paths.formatToSongPath(PlayState.SONG.song));
+			set('loadedSongName', Song.loadedSongName);
+			set('loadedSongPath', Paths.formatToSongPath(Song.loadedSongName));
+			set('chartPath', Song.chartPath);
+			set('startedCountdown', false);
+			set('curStage', PlayState.SONG.stage);
+			set('hasVocals', PlayState.SONG.needsVoices);
+		}
+		else
+		{
+			// Giá trị mặc định an toàn cho script chạy ngoài PlayState (menu, custom state...)
+			set('curBpm', Conductor.bpm);
+			set('bpm', 0);
+			set('scrollSpeed', 1);
+			set('crochet', Conductor.crochet);
+			set('stepCrochet', Conductor.stepCrochet);
+			set('songLength', 0);
+			set('songName', '');
+			set('songPath', '');
+			set('loadedSongName', '');
+			set('loadedSongPath', '');
+			set('chartPath', '');
+			set('startedCountdown', false);
+			set('curStage', '');
+			set('hasVocals', false);
+		}
 
 		set('isStoryMode', PlayState.isStoryMode);
 		set('difficulty', PlayState.storyDifficulty);
@@ -112,7 +139,6 @@ class FunkinLua {
 		set('weekRaw', PlayState.storyWeek);
 		set('week', WeekData.weeksList[PlayState.storyWeek]);
 		set('seenCutscene', PlayState.seenCutscene);
-		set('hasVocals', PlayState.SONG.needsVoices);
 
 		// Screen stuff
 		set('screenWidth', FlxG.width);
@@ -212,8 +238,9 @@ class FunkinLua {
 		//
 		Lua_helper.add_callback(lua, "getRunningScripts", function() {
 			var runningScripts:Array<String> = [];
-			for (script in game.luaArray)
-				runningScripts.push(script.scriptName);
+			if(currentState != null)
+				for (script in currentState.luaArray)
+					runningScripts.push(script.scriptName);
 
 			return runningScripts;
 		});
@@ -221,33 +248,36 @@ class FunkinLua {
 		addLocalCallback("setOnScripts", function(varName:String, arg:Dynamic, ?ignoreSelf:Bool = false, ?exclusions:Array<String> = null) {
 			if(exclusions == null) exclusions = [];
 			if(ignoreSelf && !exclusions.contains(scriptName)) exclusions.push(scriptName);
-			game.setOnScripts(varName, arg, exclusions);
+			if(currentState != null) currentState.setOnScripts(varName, arg, exclusions);
 		});
 		addLocalCallback("setOnHScript", function(varName:String, arg:Dynamic, ?ignoreSelf:Bool = false, ?exclusions:Array<String> = null) {
 			if(exclusions == null) exclusions = [];
 			if(ignoreSelf && !exclusions.contains(scriptName)) exclusions.push(scriptName);
-			game.setOnHScript(varName, arg, exclusions);
+			if(currentState != null) currentState.setOnHScript(varName, arg, exclusions);
 		});
 		addLocalCallback("setOnLuas", function(varName:String, arg:Dynamic, ?ignoreSelf:Bool = false, ?exclusions:Array<String> = null) {
 			if(exclusions == null) exclusions = [];
 			if(ignoreSelf && !exclusions.contains(scriptName)) exclusions.push(scriptName);
-			game.setOnLuas(varName, arg, exclusions);
+			if(currentState != null) currentState.setOnLuas(varName, arg, exclusions);
 		});
 
 		addLocalCallback("callOnScripts", function(funcName:String, ?args:Array<Dynamic> = null, ?ignoreStops=false, ?ignoreSelf:Bool = true, ?excludeScripts:Array<String> = null, ?excludeValues:Array<Dynamic> = null) {
 			if(excludeScripts == null) excludeScripts = [];
 			if(ignoreSelf && !excludeScripts.contains(scriptName)) excludeScripts.push(scriptName);
-			return game.callOnScripts(funcName, args, ignoreStops, excludeScripts, excludeValues);
+			if(currentState != null) return currentState.callOnScripts(funcName, args, ignoreStops, excludeScripts, excludeValues);
+			return null;
 		});
 		addLocalCallback("callOnLuas", function(funcName:String, ?args:Array<Dynamic> = null, ?ignoreStops=false, ?ignoreSelf:Bool = true, ?excludeScripts:Array<String> = null, ?excludeValues:Array<Dynamic> = null) {
 			if(excludeScripts == null) excludeScripts = [];
 			if(ignoreSelf && !excludeScripts.contains(scriptName)) excludeScripts.push(scriptName);
-			return game.callOnLuas(funcName, args, ignoreStops, excludeScripts, excludeValues);
+			if(currentState != null) return currentState.callOnLuas(funcName, args, ignoreStops, excludeScripts, excludeValues);
+			return null;
 		});
 		addLocalCallback("callOnHScript", function(funcName:String, ?args:Array<Dynamic> = null, ?ignoreStops=false, ?ignoreSelf:Bool = true, ?excludeScripts:Array<String> = null, ?excludeValues:Array<Dynamic> = null) {
 			if(excludeScripts == null) excludeScripts = [];
 			if(ignoreSelf && !excludeScripts.contains(scriptName)) excludeScripts.push(scriptName);
-			return game.callOnHScript(funcName, args, ignoreStops, excludeScripts, excludeValues);
+			if(currentState != null) return currentState.callOnHScript(funcName, args, ignoreStops, excludeScripts, excludeValues);
+			return null;
 		});
 
 		Lua_helper.add_callback(lua, "callScript", function(luaFile:String, funcName:String, ?args:Array<Dynamic> = null) {
@@ -257,9 +287,10 @@ class FunkinLua {
 
 			var luaPath:String = findScript(luaFile);
 			if(luaPath != null)
-				for (luaInstance in game.luaArray)
-					if(luaInstance.scriptName == luaPath)
-						return luaInstance.call(funcName, args);
+				if(currentState != null)
+					for (luaInstance in currentState.luaArray)
+						if(luaInstance.scriptName == luaPath)
+							return luaInstance.call(funcName, args);
 
 			return null;
 		});
@@ -267,18 +298,20 @@ class FunkinLua {
 			var luaPath:String = findScript(scriptFile);
 			if(luaPath != null)
 			{
-				for (luaInstance in game.luaArray)
-					if(luaInstance.scriptName == luaPath)
-						return true;
+				if(currentState != null)
+					for (luaInstance in currentState.luaArray)
+						if(luaInstance.scriptName == luaPath)
+							return true;
 			}
 
 			#if HSCRIPT_ALLOWED
 			var hscriptPath:String = findScript(scriptFile, '.hx');
 			if(hscriptPath != null)
 			{
-				for (hscriptInstance in game.hscriptArray)
-					if(hscriptInstance.origin == hscriptPath)
-						return true;
+				if(currentState != null)
+					for (hscriptInstance in currentState.hscriptArray)
+						if(hscriptInstance.origin == hscriptPath)
+							return true;
 			}
 			#end
 			return false;
@@ -297,12 +330,13 @@ class FunkinLua {
 			if(luaPath != null)
 			{
 				if(!ignoreAlreadyRunning)
-					for (luaInstance in game.luaArray)
-						if(luaInstance.scriptName == luaPath)
-						{
-							luaTrace('addLuaScript: The script "' + luaPath + '" is already running!');
-							return;
-						}
+					if(currentState != null)
+						for (luaInstance in currentState.luaArray)
+							if(luaInstance.scriptName == luaPath)
+							{
+								luaTrace('addLuaScript: The script "' + luaPath + '" is already running!');
+								return;
+							}
 
 				new FunkinLua(luaPath);
 				return;
@@ -315,14 +349,15 @@ class FunkinLua {
 			if(scriptPath != null)
 			{
 				if(!ignoreAlreadyRunning)
-					for (script in game.hscriptArray)
-						if(script.origin == scriptPath)
-						{
-							luaTrace('addHScript: The script "' + scriptPath + '" is already running!');
-							return;
-						}
+					if(currentState != null)
+						for (script in currentState.hscriptArray)
+							if(script.origin == scriptPath)
+							{
+								luaTrace('addHScript: The script "' + scriptPath + '" is already running!');
+								return;
+							}
 
-				PlayState.instance.initHScript(scriptPath);
+				if(currentState != null) currentState.initHScript(scriptPath);
 				return;
 			}
 			luaTrace("addHScript: Script doesn't exist!", false, false, FlxColor.RED);
@@ -335,15 +370,16 @@ class FunkinLua {
 			if(luaPath != null)
 			{
 				var foundAny:Bool = false;
-				for (luaInstance in game.luaArray)
-				{
-					if(luaInstance.scriptName == luaPath)
+				if(currentState != null)
+					for (luaInstance in currentState.luaArray)
 					{
-						trace('Closing lua script $luaPath');
-						luaInstance.stop();
-						foundAny = true;
+						if(luaInstance.scriptName == luaPath)
+						{
+							trace('Closing lua script $luaPath');
+							luaInstance.stop();
+							foundAny = true;
+						}
 					}
-				}
 				if(foundAny) return true;
 			}
 
@@ -356,15 +392,16 @@ class FunkinLua {
 			if(scriptPath != null)
 			{
 				var foundAny:Bool = false;
-				for (script in game.hscriptArray)
-				{
-					if(script.origin == scriptPath)
+				if(currentState != null)
+					for (script in currentState.hscriptArray)
 					{
-						trace('Closing hscript $scriptPath');
-						script.destroy();
-						foundAny = true;
+						if(script.origin == scriptPath)
+						{
+							trace('Closing hscript $scriptPath');
+							script.destroy();
+							foundAny = true;
+						}
 					}
-				}
 				if(foundAny) return true;
 			}
 
@@ -1565,6 +1602,7 @@ class FunkinLua {
 		TextFunctions.implement(this);
 		ExtraFunctions.implement(this);
 		CustomSubstate.implement(this);
+		CustomStateFunctions.implement(this);
 		ShaderFunctions.implement(this);
 		DeprecatedFunctions.implement(this);
 		MobileFunctions.implement(this);
