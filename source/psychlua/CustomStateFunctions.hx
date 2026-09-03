@@ -12,7 +12,7 @@ class CustomStateFunctions
 
 	public static function switchCustomState(stateName:String)
 	{
-		CustomState.switchTo(stateName);
+		CustomState.openState(stateName);
 		return true;
 	}
 

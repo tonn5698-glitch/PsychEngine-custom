@@ -92,7 +92,7 @@ class CustomState extends MusicBeatState
 		super.destroy(); // luaArray/hscriptArray được MusicBeatState.destroy() dọn
 	}
 
-	public static function switchTo(stateName:String)
+	public static function openState(stateName:String)
 	{
 		MusicBeatState.switchState(new CustomState(stateName));
 	}
