@@ -297,14 +297,6 @@ class Paths
 
 	inline static public function font(key:String)
 	{
-		// Vietnamese font override: khi language = vi-VN, dùng font hỗ trợ tiếng Việt
-		#if MODS_ALLOWED
-		if (key == 'vcr.ttf' && ClientPrefs.data.language == 'vi-VN')
-		{
-			var viFont:String = modFolders('fonts/KK7VCROSDMono.ttf');
-			if (FileSystem.exists(viFont)) return viFont;
-		}
-		#end
 		var folderKey:String = Language.getFileTranslation('fonts/$key');
 		#if MODS_ALLOWED
 		var file:String = modFolders(folderKey);
