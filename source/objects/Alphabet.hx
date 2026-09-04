@@ -244,7 +244,7 @@ class Alphabet extends FlxSpriteGroup
 						var fontSize:Int = bold ? 48 : 32;
 						var fb:FlxText = new FlxText(xPos, rows * Y_PER_ROW * scale.y, 0, character.toUpperCase(), fontSize);
 						fb.setFormat(Paths.font("vcr.ttf"), fontSize, 0xFFFFFFFF, 0);
-						fb.borderStyle = 2; // OUTLINE
+						fb.borderStyle = OUTLINE;
 						fb.borderSize = 2;
 						fb.borderColor = 0xFF000000;
 						fb.antialiasing = ClientPrefs.data.antialiasing;
