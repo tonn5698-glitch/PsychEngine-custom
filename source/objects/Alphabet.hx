@@ -203,8 +203,8 @@ class Alphabet extends FlxSpriteGroup
 				var spaceChar:Bool = (character == " " || (bold && character == "_"));
 				if (spaceChar) consecutiveSpaces++;
 
-				var isAlphabet:Bool = AlphaCharacter.isTypeAlphabet(character.toLowerCase());
-				if (AlphaCharacter.allLetters.exists(character.toLowerCase()) && (!bold || !spaceChar))
+				var inAlphabet:Bool = AlphaCharacter.allLetters.exists(character.toLowerCase());
+				if ((inAlphabet || character.trim().length > 0) && (!bold || !spaceChar))
 				{
 					if (consecutiveSpaces > 0)
 					{
@@ -218,22 +218,45 @@ class Alphabet extends FlxSpriteGroup
 					}
 					consecutiveSpaces = 0;
 
-					var letter:AlphaCharacter = cast recycle(AlphaCharacter, true);
-					letter.scale.x = scaleX;
-					letter.scale.y = scaleY;
-					letter.rowWidth = 0;
+					if (inAlphabet)
+					{
+						// Glyph có trong spritesheet → dùng AlphaCharacter
+						var letter:AlphaCharacter = cast recycle(AlphaCharacter, true);
+						letter.scale.x = scaleX;
+						letter.scale.y = scaleY;
+						letter.rowWidth = 0;
 
-					letter.setupAlphaCharacter(xPos, rows * Y_PER_ROW * scale.y, character, bold);
-					@:privateAccess letter.parent = this;
+						letter.setupAlphaCharacter(xPos, rows * Y_PER_ROW * scale.y, character, bold);
+						@:privateAccess letter.parent = this;
 
-					letter.row = rows;
-					var off:Float = 0;
-					if(!bold) off = 2;
-					xPos += letter.width + (letter.letterOffset[0] + off) * scale.x;
-					rowData[rows] = xPos;
+						letter.row = rows;
+						var off:Float = 0;
+						if(!bold) off = 2;
+						xPos += letter.width + (letter.letterOffset[0] + off) * scale.x;
+						rowData[rows] = xPos;
 
-					add(letter);
-					letters.push(letter);
+						add(letter);
+						letters.push(letter);
+					}
+					else
+					{
+						// Glyph KHÔNG có → fallback FlxText với VCR font
+						var fontSize:Int = bold ? 48 : 32;
+						var fb:FlxText = new FlxText(xPos, rows * Y_PER_ROW * scale.y, 0, character.toUpperCase(), fontSize);
+						fb.setFormat(Paths.font("vcr.ttf"), fontSize, 0xFFFFFFFF, 0);
+						fb.borderStyle = 2; // OUTLINE
+						fb.borderSize = 2;
+						fb.borderColor = 0xFF000000;
+						fb.antialiasing = ClientPrefs.data.antialiasing;
+						fb.scale.x = scaleX;
+						fb.scale.y = scaleY;
+						fb.updateHitbox();
+						fb.offset.set(0, 0);
+						add(fb);
+
+						xPos += fb.width + 4 * scale.x;
+						rowData[rows] = xPos;
+					}
 				}
 			}
 			else
