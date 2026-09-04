@@ -21,37 +21,63 @@ class PsychGlobalScript
 	function loadScripts()
 	{
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		var owner:MusicBeatState = MusicBeatState.getState(); // state đang tạo (thường là state đầu game)
+		var owner:MusicBeatState = MusicBeatState.getState();
+		var loadedPaths:Array<String> = [];
 
+		// 1) Scan shared (game built-in)
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'customStates/global/'))
 		{
-			for (file in Paths.readDirectory(folder))
+			if (!loadedPaths.contains(folder))
 			{
-				#if LUA_ALLOWED
-				if (file.toLowerCase().endsWith('.lua'))
-				{
-					var lua = new FunkinLua(folder + file);
-					// new FunkinLua() tự push vào owner.luaArray (patch Bước 3, tài liệu 1) —
-					// rút ra để owner.destroy() không lỡ tay hủy mất script global.
-					if (owner != null) owner.luaArray.remove(lua);
-					luaArray.push(lua);
-				}
-				#end
+				loadFolder(folder);
+				loadedPaths.push(folder);
+			}
+		}
 
-				#if HSCRIPT_ALLOWED
-				if (file.toLowerCase().endsWith('.hx'))
+		// 2) Scan mods
+		for (mod in Mods.getModDirectories())
+		{
+			var modPath:String = Paths.mods(mod + '/customStates/global/');
+			if (sys.FileSystem.exists(modPath))
+			{
+				if (!loadedPaths.contains(modPath))
 				{
-					var script = new HScript(null, folder + file);
-					if (script.exists('onCreate')) script.call('onCreate');
-					hscriptArray.push(script);
+					loadFolder(modPath);
+					loadedPaths.push(modPath);
 				}
-				#end
 			}
 		}
 		#end
 
 		callOnScripts('onCreate', []);
 	}
+
+	#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+	function loadFolder(folder:String)
+	{
+		var owner:MusicBeatState = MusicBeatState.getState();
+		for (file in Paths.readDirectory(folder))
+		{
+			#if LUA_ALLOWED
+			if (file.toLowerCase().endsWith('.lua'))
+			{
+				var lua = new FunkinLua(folder + file);
+				if (owner != null) owner.luaArray.remove(lua);
+				luaArray.push(lua);
+			}
+			#end
+
+			#if HSCRIPT_ALLOWED
+			if (file.toLowerCase().endsWith('.hx'))
+			{
+				var script = new HScript(null, folder + file);
+				if (script.exists('onCreate')) script.call('onCreate');
+				hscriptArray.push(script);
+			}
+			#end
+		}
+	}
+	#end
 
 	public function callOnScripts(funcToCall:String, args:Array<Dynamic> = null):Void
 	{
