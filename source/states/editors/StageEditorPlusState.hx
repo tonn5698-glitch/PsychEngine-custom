@@ -72,6 +72,7 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 	// StageEditor++: touchpad mode switch (camera ↔ object)
 	var editMode:Bool = false; // false=camera, true=object move
 	var editModeIndicator:FlxText;
+	var showSelectionQuad:Bool = true;
 
 	override function create()
 	{
