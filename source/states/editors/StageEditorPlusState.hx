@@ -1717,7 +1717,7 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 				if(meta == null || meta.sprite == null) continue;
 				var spr:FlxSprite = meta.sprite;
 				var bounds:FlxRect = FlxRect.get(spr.x - spr.offset.x * spr.scale.x, spr.y - spr.offset.y * spr.scale.y, spr.frameWidth * spr.scale.x, spr.frameHeight * spr.scale.y);
-				if(bounds.contains(mouseWorldX, mouseWorldY))
+				if(mouseWorldX >= bounds.x && mouseWorldX <= bounds.x + bounds.width && mouseWorldY >= bounds.y && mouseWorldY <= bounds.y + bounds.height)
 				{
 					if(j < maxLen)
 						spriteListRadioGroup.checked = maxLen - j - 1;
