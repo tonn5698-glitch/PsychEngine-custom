@@ -23,10 +23,6 @@ import openfl.events.IOErrorEvent;
 import psychlua.ModchartSprite;
 import flash.net.FileFilter;
 
-#if LUA_ALLOWED
-import psychlua.FunkinLua;
-#end
-
 import states.editors.content.Prompt;
 import states.editors.content.PreloadListSubState;
 
@@ -67,11 +63,16 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 	
 	var selectionSprites:FlxSpriteGroup = new FlxSpriteGroup();
 
-	// StageEditor++: grid + snap helpers
+	// StageEditor++: background grid
 	var gridBackdrop:FlxBackdrop;
 	var showGrid:Bool = true;
 	var snapToGrid:Bool = true;
 	var gridSize:Int = 50;
+
+	// StageEditor++: touchpad mode switch (camera ↔ object)
+	var editMode:Bool = false; // false=camera, true=object move
+	var editModeIndicator:FlxText;
+
 	override function create()
 	{
 		Paths.clearStoredMemory();
@@ -97,11 +98,19 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		FlxG.camera.follow(null, LOCKON, 0);
 
 		loadJsonAssetDirectory();
-		gf = new Character(0, 0, stageJson._editorMeta != null ? stageJson._editorMeta.gf : 'gf');
-		gf.visible = !(stageJson.hide_girlfriend);
-		gf.scrollFactor.set(0.95, 0.95);
-		dad = new Character(0, 0, stageJson._editorMeta != null ? stageJson._editorMeta.dad : 'dad');
-		boyfriend = new Character(0, 0, stageJson._editorMeta != null ? stageJson._editorMeta.boyfriend : 'bf', true);
+		try {
+			gf = new Character(0, 0, stageJson._editorMeta != null ? stageJson._editorMeta.gf : 'gf');
+		} catch(e:Dynamic) { gf = null; trace('StageEditor++: could not load gf: $e'); }
+		if (gf != null) {
+			gf.visible = !(stageJson.hide_girlfriend);
+			gf.scrollFactor.set(0.95, 0.95);
+		}
+		try {
+			dad = new Character(0, 0, stageJson._editorMeta != null ? stageJson._editorMeta.dad : 'dad');
+		} catch(e:Dynamic) { dad = null; trace('StageEditor++: could not load dad: $e'); }
+		try {
+			boyfriend = new Character(0, 0, stageJson._editorMeta != null ? stageJson._editorMeta.boyfriend : 'bf', true);
+		} catch(e:Dynamic) { boyfriend = null; trace('StageEditor++: could not load bf: $e'); }
 
 		for (i in 0...4)
 		{
@@ -124,15 +133,20 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		add(camFollow);
 		updateSpriteList();
 
-		// StageEditor++: load stage Lua script (like PlayState does)
-		#if LUA_ALLOWED
-		startStageLua();
-		callOnScripts('onCreatePost');
-		#end
+		// StageEditor++: ensure camera is always valid (fixes PsychUIButton.overlaps crash)
+		FlxG.camera = camGame;
 
 		addHelpScreen();
 		FlxG.mouse.visible = true;
 		animationEditor = new StageEditorPlusAnimationSubstate();
+
+		// StageEditor++: mode indicator
+		editModeIndicator = new FlxText(260, 10, 300, 'Mode: CAMERA (tap select to switch)', 14);
+		editModeIndicator.setFormat(Paths.font("vcr.ttf"), 14, FlxColor.YELLOW, LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		editModeIndicator.scrollFactor.set();
+		editModeIndicator.cameras = [camHUD];
+		editModeIndicator.borderSize = 1;
+		add(editModeIndicator);
 
 		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
 		addTouchPadCamera();
@@ -146,69 +160,10 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		var weekDir:String = stageJson.directory;
 		if (weekDir != null && weekDir.length > 0 && weekDir != '') directory = weekDir;
 
-		Paths.setCurrentLevel(directory);
+	Paths.setCurrentLevel(directory);
 		trace('Setting asset folder to ' + directory);
 	}
 
-	// StageEditor++: load stage Lua script like in PlayState (stages/<stage>.lua)
-	var stageLuaLoaded:Bool = false;
-	var stageLuaScriptName:String = null;
-	function startStageLua()
-	{
-		#if LUA_ALLOWED
-		if (lastLoadedStage == null || lastLoadedStage.length < 1) return;
-
-		var luaFile:String = 'stages/' + lastLoadedStage + '.lua';
-		var luaToLoad:String = Paths.modFolders(luaFile);
-		if (!FileSystem.exists(luaToLoad))
-			luaToLoad = Paths.getSharedPath(luaFile);
-
-		for (script in luaArray)
-			if(script.scriptName == luaToLoad) return;
-
-		if (FileSystem.exists(luaToLoad))
-		{
-			new FunkinLua(luaToLoad);
-			stageLuaLoaded = true;
-			stageLuaScriptName = luaToLoad;
-
-			// StageEditor++: expose sprites/characters to Lua like PlayState does
-			// so stage scripts can position them while editing.
-			for (script in luaArray)
-			{
-				if(script.scriptName != luaToLoad) continue;
-				script.set('gf', gf);
-				script.set('girlfriendGroup', gf);
-				script.set('dad', dad);
-				script.set('opponentGroup', dad);
-				script.set('boyfriend', boyfriend);
-				script.set('boyfriendGroup', boyfriend);
-				for (m in stageSprites)
-					if(m != null && m.name != null && m.name.length > 0)
-						script.set(m.name, m.sprite);
-			}
-			trace('initialized stage lua: $luaToLoad');
-		}
-		#end
-	}
-
-	function stopStageLua()
-	{
-		#if LUA_ALLOWED
-		if (!stageLuaLoaded || stageLuaScriptName == null) return;
-		for (script in luaArray.copy())
-			if (script.scriptName == stageLuaScriptName)
-			{
-				script.call('onDestroy', []);
-				script.stop();
-				luaArray.remove(script);
-			}
-		stageLuaLoaded = false;
-		stageLuaScriptName = null;
-		#end
-	}
-
-	var showSelectionQuad:Bool = true;
 	function addHelpScreen()
 	{
 		#if FLX_DEBUG
@@ -1270,14 +1225,11 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 			DiscordClient.changePresence('Stage Editor', 'Stage: ' + lastLoadedStage);
 			#end
 
-			stopStageLua();
 			stageJson = StageData.getStageFile(lastLoadedStage);
 			updateSpriteList();
 			updateStageDataUI();
 			reloadCharacters();
 			reloadStageDropDown();
-			startStageLua();
-			callOnScripts('onCreatePost');
 		});
 
 		var dummyStage:PsychUIButton = new PsychUIButton(140, 40, 'Load Template', function()
@@ -1286,13 +1238,10 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 			DiscordClient.changePresence('Stage Editor', 'New Stage');
 			#end
 
-			stopStageLua();
 			stageJson = StageData.dummy();
 			updateSpriteList();
 			updateStageDataUI();
 			reloadCharacters();
-			startStageLua();
-			callOnScripts('onCreatePost');
 		});
 		dummyStage.normalStyle.bgColor = FlxColor.RED;
 		dummyStage.normalStyle.textColor = FlxColor.WHITE;
@@ -1307,7 +1256,6 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 			if (Assets.exists(path))
 			#end
 			{
-				stopStageLua();
 				stageJson = StageData.getStageFile(selected);
 				lastLoadedStage = selected;
 				#if DISCORD_ALLOWED
@@ -1317,8 +1265,6 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 				updateStageDataUI();
 				reloadCharacters();
 				reloadStageDropDown();
-				startStageLua();
-				callOnScripts('onCreatePost');
 			}
 			else
 			{
@@ -1446,9 +1392,9 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 	{
 		if(stageJson._editorMeta != null)
 		{
-			gf.changeCharacter(stageJson._editorMeta.gf);
-			dad.changeCharacter(stageJson._editorMeta.dad);
-			boyfriend.changeCharacter(stageJson._editorMeta.boyfriend);
+			if(gf != null) gf.changeCharacter(stageJson._editorMeta.gf);
+			if(dad != null) dad.changeCharacter(stageJson._editorMeta.dad);
+			if(boyfriend != null) boyfriend.changeCharacter(stageJson._editorMeta.boyfriend);
 		}
 		repositionGirlfriend();
 		repositionDad();
@@ -1459,9 +1405,9 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		var point = focusOnTarget('boyfriend');
 		FlxG.camera.scroll.set(point.x - FlxG.width/2, point.y - FlxG.height/2);
 		FlxG.camera.zoom = stageJson.defaultZoom;
-		oppDropdown.selectedLabel = dad.curCharacter;
-		gfDropdown.selectedLabel = gf.curCharacter;
-		plDropdown.selectedLabel = boyfriend.curCharacter;
+		if(dad != null) oppDropdown.selectedLabel = dad.curCharacter;
+		if(gf != null) gfDropdown.selectedLabel = gf.curCharacter;
+		if(boyfriend != null) plDropdown.selectedLabel = boyfriend.curCharacter;
 	}
 	
 	function reloadStageDropDown()
@@ -1527,18 +1473,13 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 	var outputTime:Float = 0;
 	override function update(elapsed:Float)
 	{
-		if(createPopup.visible && (FlxG.mouse.justPressedRight || (FlxG.mouse.justPressed && !FlxG.mouse.overlaps(createPopup, camHUD))))
+		if(FlxG.camera != null && createPopup.visible && (FlxG.mouse.justPressedRight || (FlxG.mouse.justPressed && !FlxG.mouse.overlaps(createPopup, camHUD))))
 			createPopup.visible = createPopup.active = false;
 
 		for (basic in stageSprites)
 			basic.update(curFilters, elapsed);
 
 		super.update(elapsed);
-
-		// StageEditor++: tick loaded stage Lua every frame like PlayState does
-		#if LUA_ALLOWED
-		callOnScripts('onUpdate', [elapsed]);
-		#end
 		
 		outputTime = Math.max(0, outputTime - elapsed);
 		outputTxt.alpha = outputTime;
@@ -1571,7 +1512,7 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 			updateSelectedUI();
 		}
 
-		if((FlxG.keys.justPressed.F1 || touchPad.buttonF.justPressed) || (helpBg.visible && FlxG.keys.justPressed.ESCAPE))
+		if(FlxG.keys.justPressed.F1 || (helpBg.visible && FlxG.keys.justPressed.ESCAPE))
 		{
 			if (controls.mobileC)
 			{
@@ -1611,6 +1552,15 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		if(FlxG.keys.justPressed.F12 || (touchPad.buttonS.justPressed && !touchPad.buttonG.justPressed))
 			showSelectionQuad = !showSelectionQuad;
 		
+		// StageEditor++: toggle edit mode (touchpad buttonF only — desktop uses J/K/L/I for camera + arrows for sprite)
+		if (touchPad.buttonF.justPressed && !helpBg.visible)
+		{
+			editMode = !editMode;
+			editModeIndicator.text = editMode ? 'Mode: OBJECT (tap F1 to switch)' : 'Mode: CAMERA (tap F1 to switch)';
+			editModeIndicator.color = editMode ? FlxColor.LIME : FlxColor.YELLOW;
+			showOutput(editMode ? 'Object mode: arrows move sprite' : 'Camera mode: arrows move camera');
+		}
+		
 		var shiftMult:Float = 1;
 		var ctrlMult:Float = 1;
 		if(FlxG.keys.pressed.SHIFT || touchPad.buttonC.pressed) shiftMult = 4;
@@ -1624,6 +1574,14 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		if (FlxG.keys.pressed.K || (touchPad.buttonDown.pressed && touchPad.buttonG.pressed)) camY += camMove;
 		if (FlxG.keys.pressed.L || (touchPad.buttonRight.pressed && touchPad.buttonG.pressed)) camX += camMove;
 		if (FlxG.keys.pressed.I || (touchPad.buttonUp.pressed && touchPad.buttonG.pressed)) camY -= camMove;
+
+		// StageEditor++: touchpad arrows → camera when in camera mode (no G needed)
+		if (editMode == false && controls.mobileC) {
+			if (touchPad.buttonLeft.justPressed) camX -= 5 * shiftMult * ctrlMult;
+			if (touchPad.buttonDown.justPressed) camY += 5 * shiftMult * ctrlMult;
+			if (touchPad.buttonRight.justPressed) camX += 5 * shiftMult * ctrlMult;
+			if (touchPad.buttonUp.justPressed) camY -= 5 * shiftMult * ctrlMult;
+		}
 
 		if(camX != 0 || camY != 0)
 		{
@@ -1641,7 +1599,7 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		else if (FlxG.keys.pressed.Q || touchPad.buttonY.pressed && FlxG.camera.zoom > minZoom)
 			FlxG.camera.zoom = Math.max(minZoom, FlxG.camera.zoom - elapsed * FlxG.camera.zoom * shiftMult * ctrlMult);
 		
-		// SPRITE X/Y
+		// SPRITE X/Y — only when in object mode (or using keyboard arrows on desktop)
 		var shiftMult:Float = 1;
 		var ctrlMult:Float = 1;
 		if(FlxG.keys.pressed.SHIFT || touchPad.buttonC.pressed) shiftMult = 4;
@@ -1649,11 +1607,12 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 
 		var moveX:Float = 0;
 		var moveY:Float = 0;
-		if (!touchPad.buttonG.pressed) {
-		if (FlxG.keys.justPressed.LEFT || touchPad.buttonLeft.justPressed) moveX -= 5 * shiftMult * ctrlMult;
-		if (FlxG.keys.justPressed.RIGHT || touchPad.buttonRight.justPressed) moveX += 5 * shiftMult * ctrlMult;
-		if (FlxG.keys.justPressed.UP || touchPad.buttonUp.justPressed) moveY -= 5 * shiftMult * ctrlMult;
-		if (FlxG.keys.justPressed.DOWN || touchPad.buttonDown.justPressed) moveY += 5 * shiftMult * ctrlMult;
+		if (editMode || !controls.mobileC) {
+			// Desktop: arrows always move sprite; Mobile: only in object mode
+			if (FlxG.keys.justPressed.LEFT || (editMode && touchPad.buttonLeft.justPressed)) moveX -= 5 * shiftMult * ctrlMult;
+			if (FlxG.keys.justPressed.RIGHT || (editMode && touchPad.buttonRight.justPressed)) moveX += 5 * shiftMult * ctrlMult;
+			if (FlxG.keys.justPressed.UP || (editMode && touchPad.buttonUp.justPressed)) moveY -= 5 * shiftMult * ctrlMult;
+			if (FlxG.keys.justPressed.DOWN || (editMode && touchPad.buttonDown.justPressed)) moveY += 5 * shiftMult * ctrlMult;
 		}
 
 		if(FlxG.mouse.pressedRight && (FlxG.mouse.deltaScreenX != 0 || FlxG.mouse.deltaScreenY != 0))
@@ -1704,7 +1663,7 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		}
 
 		// StageEditor++: click to select a sprite on the stage
-		if (FlxG.mouse.justPressed && !createPopup.visible && !FlxG.mouse.overlaps(UI_box, camHUD) && !FlxG.mouse.overlaps(UI_stagebox, camHUD) && !FlxG.mouse.overlaps(spriteList_box, camHUD))
+		if (FlxG.camera != null && FlxG.mouse.justPressed && !createPopup.visible && !FlxG.mouse.overlaps(UI_box, camHUD) && !FlxG.mouse.overlaps(UI_stagebox, camHUD) && !FlxG.mouse.overlaps(spriteList_box, camHUD))
 		{
 			var cam:FlxCamera = FlxG.camera;
 			var mouseWorldX:Float = cam.scroll.x + (FlxG.mouse.screenX / cam.zoom);
@@ -1773,23 +1732,29 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		switch(target)
 		{
 			case 'boyfriend':
-				focusPoint.x += boyfriend.getMidpoint().x - boyfriend.cameraPosition[0] - 100;
-				focusPoint.y += boyfriend.getMidpoint().y + boyfriend.cameraPosition[1] - 100;
+				if(boyfriend != null)
+				{
+					focusPoint.x += boyfriend.getMidpoint().x - boyfriend.cameraPosition[0] - 100;
+					focusPoint.y += boyfriend.getMidpoint().y + boyfriend.cameraPosition[1] - 100;
+				}
 				if(stageJson.camera_boyfriend != null && stageJson.camera_boyfriend.length > 1)
 				{
 					focusPoint.x += stageJson.camera_boyfriend[0];
 					focusPoint.y += stageJson.camera_boyfriend[1];
 				}
 			case 'dad':
-				focusPoint.x += dad.getMidpoint().x + dad.cameraPosition[0] + 150;
-				focusPoint.y += dad.getMidpoint().y + dad.cameraPosition[1] - 100;
+				if(dad != null)
+				{
+					focusPoint.x += dad.getMidpoint().x + dad.cameraPosition[0] + 150;
+					focusPoint.y += dad.getMidpoint().y + dad.cameraPosition[1] - 100;
+				}
 				if(stageJson.camera_opponent != null && stageJson.camera_opponent.length > 1)
 				{
 					focusPoint.x += stageJson.camera_opponent[0];
 					focusPoint.y += stageJson.camera_opponent[1];
 				}
 			case 'gf':
-				if(gf.visible)
+				if(gf != null && gf.visible)
 				{
 					focusPoint.x += gf.getMidpoint().x + gf.cameraPosition[0];
 					focusPoint.y += gf.getMidpoint().y + gf.cameraPosition[1];
@@ -1806,18 +1771,21 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 
 	function repositionGirlfriend()
 	{
+		if(gf == null) return;
 		gf.setPosition(stageJson.girlfriend[0], stageJson.girlfriend[1]);
 		gf.x += gf.positionArray[0];
 		gf.y += gf.positionArray[1];
 	}
 	function repositionDad()
 	{
+		if(dad == null) return;
 		dad.setPosition(stageJson.opponent[0], stageJson.opponent[1]);
 		dad.x += dad.positionArray[0];
 		dad.y += dad.positionArray[1];
 	}
 	function repositionBoyfriend()
 	{
+		if(boyfriend == null) return;
 		boyfriend.setPosition(stageJson.boyfriend[0], stageJson.boyfriend[1]);
 		boyfriend.x += boyfriend.positionArray[0];
 		boyfriend.y += boyfriend.positionArray[1];
