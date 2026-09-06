@@ -74,6 +74,9 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 	var editModeIndicator:FlxText;
 	var showSelectionQuad:Bool = true;
 
+	// StageEditor++: track current stage's mod folder for asset resolution
+	var stageModFolder:String = '';
+
 	override function create()
 	{
 		Paths.clearStoredMemory();
@@ -232,12 +235,21 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 		var list:Map<String, FlxSprite> = [];
 		if(stageJson.objects != null && stageJson.objects.length > 0)
 		{
+			// StageEditor++: temporarily set mod directory so Paths.image() resolves mod assets
+			var prevModDir:String = Mods.currentModDirectory;
+			if(stageJson._editorMeta != null && stageJson._editorMeta.modFolder != null && stageJson._editorMeta.modFolder.length > 0)
+			{
+				Mods.currentModDirectory = stageJson._editorMeta.modFolder;
+				stageModFolder = stageJson._editorMeta.modFolder;
+			}
+			else stageModFolder = '';
+
 			list = StageData.addObjectsToState(stageJson.objects, gf, dad, boyfriend, null, true);
+
+			Mods.currentModDirectory = prevModDir;
+
 			for (key => spr in list)
 				stageSprites[spr.ID] = new StageEditorPlusMetaSprite(stageJson.objects[spr.ID], spr);
-
-			/*for (num => spr in stageSprites)
-				trace('$num: ${spr.type}, ${spr.name}');*/
 		}
 
 		for (character in ['gf', 'dad', 'boyfriend'])
@@ -2040,7 +2052,12 @@ class StageEditorPlusState extends MusicBeatState implements PsychUIEventHandler
 	{
 		if(spr == null || StageData.reservedNames.contains(spr.type) || spr.type == 'square' || imgPath == null) return;
 
+		// StageEditor++: ensure mod directory is set for correct image resolution
+		var prevModDir:String = Mods.currentModDirectory;
+		if(stageModFolder.length > 0) Mods.currentModDirectory = stageModFolder;
+
 		spr.image = imgPath;
+		Mods.currentModDirectory = prevModDir;
 		updateSelectedUI();
 	}
 
