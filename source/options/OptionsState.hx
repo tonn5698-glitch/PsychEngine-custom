@@ -11,7 +11,8 @@ class OptionsState extends MusicBeatState
 		'Adjust Delay and Combo',
 		'Graphics',
 		'Visuals',
-		'Gameplay'
+		'Gameplay',
+		'Optimization'
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 		,'Mobile Options'
 	];
@@ -37,6 +38,8 @@ class OptionsState extends MusicBeatState
 				openSubState(new options.VisualsSettingsSubState());
 			case 'Gameplay':
 				openSubState(new options.GameplaySettingsSubState());
+			case 'Optimization':
+				openSubState(new options.OptimizationSubState());
 			case 'Adjust Delay and Combo':
 				MusicBeatState.switchState(new options.NoteOffsetState());
 			case 'Mobile Options':

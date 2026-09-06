@@ -37,6 +37,19 @@ import states.TitleState;
 	public var framerate:Int = 60;
 	public var camZooms:Bool = true;
 	public var hideHud:Bool = false;
+
+	// Optimization (ported from FNF-JS-Engine OptimizationSubState)
+	public var enableGC:Bool = true;
+	public var opponentLightStrum:Bool = true;
+	public var botLightStrum:Bool = true;
+	public var playerLightStrum:Bool = true;
+	public var ratingPopups:Bool = true;
+	public var comboPopups:Bool = true;
+	public var showMS:Bool = false;
+	public var noSpawnFunc:Bool = false;
+	public var noHitFuncs:Bool = false;
+	public var noSkipFuncs:Bool = false;
+	public var lessBotLag:Bool = false;
 	public var noteOffset:Int = 0;
 	public var arrowRGB:Array<Array<FlxColor>> = [
 		[0xFFC24B99, 0xFFFFFFFF, 0xFF3C1F56],
