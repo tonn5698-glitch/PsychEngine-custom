@@ -2,7 +2,7 @@ package psychlua;
 
 #if (!flash && sys)
 import flixel.addons.display.FlxRuntimeShader;
-import flixel.addons.display.FlxShaderFilter;
+import openfl.filters.ShaderFilter;
 #end
 
 class ShaderFunctions
@@ -93,7 +93,7 @@ class ShaderFunctions
 
 			var arr:Array<String> = funk.runtimeShaders.get(shader);
 			var shaderObj = new shaders.ErrorHandledShader.ErrorHandledRuntimeShader(shader, arr[0], arr[1]);
-			var filter = new FlxShaderFilter(shaderObj);
+			var filter = new ShaderFilter(shaderObj);
 
 			// Store shader name on camera for later reference
 			if(cam.filters == null) cam.filters = [];
