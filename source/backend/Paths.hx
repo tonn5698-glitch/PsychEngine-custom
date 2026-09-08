@@ -206,8 +206,16 @@ class Paths
 		#if MODS_ALLOWED
 		var file:String = modsVideo(key);
 		if(FileSystem.exists(file)) return file;
+		var webmFile:String = modFolders('videos/' + key + '.webm');
+		if(FileSystem.exists(webmFile)) return webmFile;
 		#end
-		return 'assets/videos/$key.$VIDEO_EXT';
+		var basicPath:String = 'assets/videos/$key.$VIDEO_EXT';
+		#if sys
+		if(FileSystem.exists(basicPath)) return basicPath;
+		var webmPath:String = 'assets/videos/$key.webm';
+		if(FileSystem.exists(webmPath)) return webmPath;
+		#end
+		return basicPath;
 	}
 
 	inline static public function sound(key:String, ?modsAllowed:Bool = true):Sound
