@@ -64,6 +64,8 @@ class IntroState extends MusicBeatState
 		var candidates:Array<String> = [
 			'${storageBase}videos/${videoFileName}.webm',
 			'${storageBase}videos/${videoFileName}.mp4',
+			'${storageBase}assets/videos/${videoFileName}.webm',
+			'${storageBase}assets/videos/${videoFileName}.mp4',
 			'${storageBase}mods/videos/${videoFileName}.${Paths.VIDEO_EXT}'
 		];
 		for (candidate in candidates)
