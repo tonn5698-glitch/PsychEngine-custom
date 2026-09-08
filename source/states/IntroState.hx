@@ -89,7 +89,7 @@ class IntroState extends MusicBeatState
 		return null;
 	}
 
-	#if android && VIDEOS_ALLOWED
+	#if (android && VIDEOS_ALLOWED)
 	function extractEmbeddedVideo():String
 	{
 		var storageBase:String = StorageUtil.getExternalStorageDirectory();
