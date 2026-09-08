@@ -2,6 +2,7 @@ package psychlua;
 
 #if (!flash && sys)
 import flixel.addons.display.FlxRuntimeShader;
+import flixel.addons.display.FlxShaderFilter;
 #end
 
 class ShaderFunctions
@@ -20,7 +21,7 @@ class ShaderFunctions
 			#end
 			return false;
 		});
-		
+
 		funk.addLocalCallback("setSpriteShader", function(obj:String, shader:String) {
 			if(!ClientPrefs.data.shaders) return false;
 
@@ -59,6 +60,98 @@ class ShaderFunctions
 				return true;
 			}
 			return false;
+		});
+
+		// Camera shader API
+		Lua_helper.add_callback(lua, "setCameraShader", function(camera:String, shader:String) {
+			if(!ClientPrefs.data.shaders) return false;
+
+			#if (!flash && sys)
+			if(!funk.runtimeShaders.exists(shader) && !funk.initLuaShader(shader))
+			{
+				FunkinLua.luaTrace('setCameraShader: Shader $shader is missing!', false, false, FlxColor.RED);
+				return false;
+			}
+
+			var cam:FlxCamera = LuaUtils.getObjectDirectly(camera);
+			if(cam == null)
+			{
+				// Try common camera names
+				switch(camera.toLowerCase())
+				{
+					case 'game' | 'camgame': cam = FlxG.camera;
+					case 'hud' | 'camhud' | 'camother': cam = FlxG.camera != null ? FlxG.cameras.list[FlxG.cameras.list.length - 1] : null;
+					case 'camfullscreen': cam = FlxG.cameras.list.length > 1 ? FlxG.cameras.list[1] : null;
+				}
+			}
+
+			if(cam == null)
+			{
+				FunkinLua.luaTrace('setCameraShader: Camera "$camera" not found!', false, false, FlxColor.RED);
+				return false;
+			}
+
+			var arr:Array<String> = funk.runtimeShaders.get(shader);
+			var shaderObj = new shaders.ErrorHandledShader.ErrorHandledRuntimeShader(shader, arr[0], arr[1]);
+			var filter = new FlxShaderFilter(shaderObj);
+
+			// Store shader name on camera for later reference
+			if(cam.filters == null) cam.filters = [];
+			cam.filters.push(filter);
+
+			return true;
+			#else
+			FunkinLua.luaTrace("setCameraShader: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
+			#end
+			return false;
+		});
+
+		Lua_helper.add_callback(lua, "removeCameraShader", function(camera:String) {
+			#if (!flash && sys)
+			var cam:FlxCamera = LuaUtils.getObjectDirectly(camera);
+			if(cam == null)
+			{
+				switch(camera.toLowerCase())
+				{
+					case 'game' | 'camgame': cam = FlxG.camera;
+					case 'hud' | 'camhud' | 'camother': cam = FlxG.camera != null ? FlxG.cameras.list[FlxG.cameras.list.length - 1] : null;
+					case 'camfullscreen': cam = FlxG.cameras.list.length > 1 ? FlxG.cameras.list[1] : null;
+				}
+			}
+
+			if(cam == null)
+			{
+				FunkinLua.luaTrace('removeCameraShader: Camera "$camera" not found!', false, false, FlxColor.RED);
+				return false;
+			}
+
+			if(cam.filters != null)
+				cam.filters = [];
+
+			return true;
+			#else
+			FunkinLua.luaTrace("removeCameraShader: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
+			#end
+			return false;
+		});
+
+		Lua_helper.add_callback(lua, "getCameraShaderCount", function(camera:String) {
+			#if (!flash && sys)
+			var cam:FlxCamera = LuaUtils.getObjectDirectly(camera);
+			if(cam == null)
+			{
+				switch(camera.toLowerCase())
+				{
+					case 'game' | 'camgame': cam = FlxG.camera;
+					case 'hud' | 'camhud' | 'camother': cam = FlxG.camera != null ? FlxG.cameras.list[FlxG.cameras.list.length - 1] : null;
+					case 'camfullscreen': cam = FlxG.cameras.list.length > 1 ? FlxG.cameras.list[1] : null;
+				}
+			}
+			if(cam == null || cam.filters == null) return 0;
+			return cam.filters.length;
+			#else
+			return 0;
+			#end
 		});
 
 
@@ -236,7 +329,7 @@ class ShaderFunctions
 			return true;
 			#else
 			FunkinLua.luaTrace("setShaderFloatArray: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
-			return true;
+			return false;
 			#end
 		});
 

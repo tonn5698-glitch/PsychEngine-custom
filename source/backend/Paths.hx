@@ -198,6 +198,103 @@ class Paths
 	inline static public function shaderVertex(key:String, ?folder:String)
 		return getPath('shaders/$key.vert', TEXT, folder, true);
 
+	#if (!flash && sys)
+	public static var runtimeShaders:Map<String, Array<String>> = new Map();
+
+	public static function loadRuntimeShader(name:String, ?logError:Bool = true):Array<String>
+	{
+		if (!ClientPrefs.data.shaders) return null;
+
+		if (runtimeShaders.exists(name))
+		{
+			var cached:Array<String> = runtimeShaders.get(name);
+			if (cached != null && (cached[0] != null || cached[1] != null))
+				return cached;
+		}
+
+		var foldersToCheck:Array<String> = [getSharedPath('shaders/')];
+		#if MODS_ALLOWED
+		foldersToCheck.push(mods('shaders/'));
+		if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
+			foldersToCheck.insert(0, mods(Mods.currentModDirectory + '/shaders/'));
+		for (mod in Mods.getGlobalMods())
+			foldersToCheck.insert(0, mods(mod + '/shaders/'));
+		#end
+
+		for (folder in foldersToCheck)
+		{
+			if (!FileSystem.exists(folder))
+				continue;
+
+			var frag:String = null;
+			var vert:String = null;
+
+			var fragPath:String = folder + name + '.frag';
+			var vertPath:String = folder + name + '.vert';
+
+			if (FileSystem.exists(fragPath))
+			{
+				frag = File.getContent(fragPath);
+				if (logError) validateShaderSource(frag, name, 'frag');
+			}
+
+			if (FileSystem.exists(vertPath))
+			{
+				vert = File.getContent(vertPath);
+				if (logError) validateShaderSource(vert, name, 'vert');
+			}
+
+			if (frag != null || vert != null)
+			{
+				runtimeShaders.set(name, [frag, vert]);
+				return [frag, vert];
+			}
+		}
+
+		if (logError)
+			FlxG.log.error('Missing shader $name: no .frag or .vert found in any search path');
+		return null;
+	}
+
+	public static function validateShaderSource(source:String, name:String, type:String):Bool
+	{
+		if (source == null || source.length == 0)
+			return false;
+
+		var issues:Array<String> = [];
+		var lower:String = source.toLowerCase();
+
+		// Check for void main()
+		if (lower.indexOf('void main') == -1)
+			issues.push('Missing void main()');
+
+		// Check for common GLSL ES issues on mobile
+		if (#if android true #else false #end)
+		{
+			if (lower.indexOf('precision') == -1 && lower.indexOf('#version') == -1)
+				issues.push('Missing precision qualifier (add "precision mediump float;" or similar)');
+		}
+
+		// Check for deprecated texture2D (should be texture in GLSL 300+)
+		if (lower.indexOf('#version 300') != -1 || lower.indexOf('#version 330') != -1)
+		{
+			if (lower.indexOf('texture2d(') != -1)
+				issues.push('texture2D() is deprecated in GLSL 300+, use texture() instead');
+			if (lower.indexOf('gl_fragcolor') != -1)
+				issues.push('gl_FragColor is deprecated in GLSL 300+, use an output variable instead');
+		}
+
+		if (issues.length > 0)
+		{
+			var msg:String = 'Shader "$name" ($type) warnings: ' + issues.join('; ');
+			FlxG.log.warn(msg);
+			trace(msg);
+			return false;
+		}
+		return true;
+	}
+	#end
+
 	inline static public function lua(key:String, ?folder:String)
 		return getPath('$key.lua', TEXT, folder, true);
 
