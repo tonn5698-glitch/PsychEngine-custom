@@ -2,6 +2,7 @@ package states;
 
 import objects.VideoSprite;
 #if android
+import mobile.backend.PsychJNI;
 import openfl.utils.Assets as OpenFlAssets;
 #end
 
@@ -24,16 +25,30 @@ class IntroState extends MusicBeatState
 	{
 		super.create();
 
+		trace('[IntroState] create()');
+		#if android
+		PsychJNI.logDebug('[IntroState] create()');
+		#end
+
 		#if VIDEOS_ALLOWED
+		trace('[IntroState] VIDEOS_ALLOWED = YES');
+		#if android PsychJNI.logDebug('[IntroState] VIDEOS_ALLOWED = YES'); #end
+
 		var videoFile:String = getVideoFile();
+
+		trace('[IntroState] videoFile = ' + videoFile);
+		#if android PsychJNI.logDebug('[IntroState] videoFile = ' + videoFile); #end
+
 		if (videoFile == null)
 		{
 			trace('[IntroState] Video not found, skipping intro...');
+			#if android PsychJNI.logDebug('[IntroState] Video not found, skipping intro...'); #end
 			goToTitle();
 			return;
 		}
 
 		trace('[IntroState] Playing intro video: ' + videoFile);
+		#if android PsychJNI.logDebug('[IntroState] Playing intro video: ' + videoFile); #end
 		videoSprite = new VideoSprite(videoFile, false, true); // skippable
 		videoSprite.finishCallback = goToTitle;
 		videoSprite.onSkip = goToTitle;
@@ -46,6 +61,8 @@ class IntroState extends MusicBeatState
 			touchPad.alpha = 0.5;
 		#end
 		#else
+		trace('[IntroState] VIDEOS_ALLOWED = NO');
+		#if android PsychJNI.logDebug('[IntroState] VIDEOS_ALLOWED = NO'); #end
 		goToTitle();
 		#end
 	}
@@ -53,8 +70,12 @@ class IntroState extends MusicBeatState
 	function getVideoFile():String
 	{
 		#if sys
+		#if android
+		PsychJNI.logDebug('[IntroState] cwd="' + Sys.getCwd() + '" storage="' + StorageUtil.getExternalStorageDirectory() + '"');
+		#end
 		#if MODS_ALLOWED
 		var modPath:String = Paths.video(videoFileName);
+		#if android PsychJNI.logDebug('[IntroState] Paths.video -> "' + modPath + '" exists=' + (modPath != null && FileSystem.exists(modPath))); #end
 		if (modPath != null && FileSystem.exists(modPath))
 			return modPath;
 		#end
@@ -69,8 +90,12 @@ class IntroState extends MusicBeatState
 			'${storageBase}mods/videos/${videoFileName}.${Paths.VIDEO_EXT}'
 		];
 		for (candidate in candidates)
-			if (FileSystem.exists(candidate))
+		{
+			var exists:Bool = FileSystem.exists(candidate);
+			#if android PsychJNI.logDebug('[IntroState] check "' + candidate + '" -> ' + exists); #end
+			if (exists)
 				return candidate;
+		}
 
 		// If the APK ships the video embedded, extract it once to storage
 		#if VIDEOS_ALLOWED
@@ -100,6 +125,7 @@ class IntroState extends MusicBeatState
 		for (ext in [Paths.VIDEO_EXT, 'webm'])
 		{
 			var assetKey:String = 'assets/videos/${videoFileName}.$ext';
+			#if android PsychJNI.logDebug('[IntroState] embedded? "' + assetKey + '" -> ' + OpenFlAssets.exists(assetKey)); #end
 			if (!OpenFlAssets.exists(assetKey))
 				continue;
 
@@ -132,6 +158,9 @@ class IntroState extends MusicBeatState
 		if (goingToTitle)
 			return;
 		goingToTitle = true;
+
+		trace('[IntroState] goToTitle()');
+		#if android PsychJNI.logDebug('[IntroState] goToTitle()'); #end
 
 		FlxTransitionableState.skipNextTransIn = true;
 		FlxTransitionableState.skipNextTransOut = true;

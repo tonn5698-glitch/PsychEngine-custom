@@ -70,6 +70,15 @@ class PsychJNI #if (lime >= "8.0.0") implements JNISafety #end
 	public static inline function setActivityTitle(title:String):Dynamic
 		return setActivityTitle_jni(title);
 
+	public static inline function logDebug(message:String):Void
+		logDebug_jni('PsychEngine', message);
+
+	public static inline function logDebugTag(tag:String, message:String):Void
+		logDebug_jni(tag, message);
+
+	@:noCompletion private static var logDebug_jni:Dynamic = JNI.createStaticMethod('android/util/Log', 'd',
+		'(Ljava/lang/String;Ljava/lang/String;)I');
+
 	@:noCompletion private static var setOrientation_jni:Dynamic = JNI.createStaticMethod('org/libsdl/app/SDLActivity', 'setOrientation',
 		'(IIZLjava/lang/String;)V');
 	@:noCompletion private static var getCurrentOrientation_jni:Dynamic = JNI.createStaticMethod('org/libsdl/app/SDLActivity', 'getCurrentOrientation', '()I');
