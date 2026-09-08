@@ -21,34 +21,53 @@ class IntroState extends MusicBeatState
 	var videoSprite:VideoSprite;
 	var goingToTitle:Bool = false;
 
+	#if sys
+	static function dbg(msg:String):Void
+	{
+		try
+		{
+			#if android
+			var dir:String = StorageUtil.getExternalStorageDirectory() + 'logs/';
+			#else
+			var dir:String = Sys.getCwd() + 'logs/';
+			#end
+			if (!FileSystem.exists(dir)) FileSystem.createDirectory(dir);
+			var file:String = dir + 'intro.log';
+			var prev:String = (FileSystem.exists(file)) ? File.getContent(file) : '';
+			File.saveContent(file, prev + '\n' + Date.now().toString() + ' ' + msg);
+		}
+		catch (e:Dynamic) {}
+		#if android
+		try { PsychJNI.logDebug(msg); } catch (e:Dynamic) {}
+		#end
+	}
+	#end
+
 	override public function create():Void
 	{
 		super.create();
 
 		trace('[IntroState] create()');
-		#if android
-		PsychJNI.logDebug('[IntroState] create()');
+		#if sys
+		dbg('[IntroState] create()');
+		dbg('[IntroState] cwd="' + Sys.getCwd() + '"');
 		#end
 
 		#if VIDEOS_ALLOWED
-		trace('[IntroState] VIDEOS_ALLOWED = YES');
-		#if android PsychJNI.logDebug('[IntroState] VIDEOS_ALLOWED = YES'); #end
+		#if sys dbg('[IntroState] VIDEOS_ALLOWED = YES'); #end
 
 		var videoFile:String = getVideoFile();
 
-		trace('[IntroState] videoFile = ' + videoFile);
-		#if android PsychJNI.logDebug('[IntroState] videoFile = ' + videoFile); #end
+		#if sys dbg('[IntroState] videoFile = ' + videoFile); #end
 
 		if (videoFile == null)
 		{
-			trace('[IntroState] Video not found, skipping intro...');
-			#if android PsychJNI.logDebug('[IntroState] Video not found, skipping intro...'); #end
+			#if sys dbg('[IntroState] Video not found, skipping intro...'); #end
 			goToTitle();
 			return;
 		}
 
-		trace('[IntroState] Playing intro video: ' + videoFile);
-		#if android PsychJNI.logDebug('[IntroState] Playing intro video: ' + videoFile); #end
+		#if sys dbg('[IntroState] Playing intro video: ' + videoFile); #end
 		videoSprite = new VideoSprite(videoFile, false, true); // skippable
 		videoSprite.finishCallback = goToTitle;
 		videoSprite.onSkip = goToTitle;
@@ -61,8 +80,7 @@ class IntroState extends MusicBeatState
 			touchPad.alpha = 0.5;
 		#end
 		#else
-		trace('[IntroState] VIDEOS_ALLOWED = NO');
-		#if android PsychJNI.logDebug('[IntroState] VIDEOS_ALLOWED = NO'); #end
+		#if sys dbg('[IntroState] VIDEOS_ALLOWED = NO'); #end
 		goToTitle();
 		#end
 	}
@@ -70,12 +88,10 @@ class IntroState extends MusicBeatState
 	function getVideoFile():String
 	{
 		#if sys
-		#if android
-		PsychJNI.logDebug('[IntroState] cwd="' + Sys.getCwd() + '" storage="' + StorageUtil.getExternalStorageDirectory() + '"');
-		#end
+		dbg('[IntroState] cwd="' + Sys.getCwd() + '" storage="' + StorageUtil.getExternalStorageDirectory() + '"');
 		#if MODS_ALLOWED
 		var modPath:String = Paths.video(videoFileName);
-		#if android PsychJNI.logDebug('[IntroState] Paths.video -> "' + modPath + '" exists=' + (modPath != null && FileSystem.exists(modPath))); #end
+		dbg('[IntroState] Paths.video -> "' + modPath + '" exists=' + (modPath != null && FileSystem.exists(modPath)));
 		if (modPath != null && FileSystem.exists(modPath))
 			return modPath;
 		#end
@@ -92,7 +108,7 @@ class IntroState extends MusicBeatState
 		for (candidate in candidates)
 		{
 			var exists:Bool = FileSystem.exists(candidate);
-			#if android PsychJNI.logDebug('[IntroState] check "' + candidate + '" -> ' + exists); #end
+			dbg('[IntroState] check "' + candidate + '" -> ' + exists);
 			if (exists)
 				return candidate;
 		}
@@ -125,8 +141,9 @@ class IntroState extends MusicBeatState
 		for (ext in [Paths.VIDEO_EXT, 'webm'])
 		{
 			var assetKey:String = 'assets/videos/${videoFileName}.$ext';
-			#if android PsychJNI.logDebug('[IntroState] embedded? "' + assetKey + '" -> ' + OpenFlAssets.exists(assetKey)); #end
-			if (!OpenFlAssets.exists(assetKey))
+			var embeddedExists:Bool = OpenFlAssets.exists(assetKey);
+			dbg('[IntroState] embedded? "' + assetKey + '" -> ' + embeddedExists);
+			if (!embeddedExists)
 				continue;
 
 			var output:String = videoDir + videoFileName + '.' + ext;
