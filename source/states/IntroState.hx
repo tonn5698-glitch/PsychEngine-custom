@@ -98,12 +98,20 @@ class IntroState extends MusicBeatState
 
 		#if android
 		var storageBase:String = StorageUtil.getExternalStorageDirectory();
+		var cwd:String = Sys.getCwd();
 		var candidates:Array<String> = [
+			// where CopyState unpacks embedded assets (Android/data/<pkg>/files)
+			'${cwd}assets/videos/${videoFileName}.${Paths.VIDEO_EXT}',
+			'${cwd}assets/videos/${videoFileName}.webm',
+			'${cwd}videos/${videoFileName}.${Paths.VIDEO_EXT}',
+			'${cwd}videos/${videoFileName}.webm',
+			// public PsychEngine storage
 			'${storageBase}videos/${videoFileName}.webm',
 			'${storageBase}videos/${videoFileName}.mp4',
 			'${storageBase}assets/videos/${videoFileName}.webm',
 			'${storageBase}assets/videos/${videoFileName}.mp4',
-			'${storageBase}mods/videos/${videoFileName}.${Paths.VIDEO_EXT}'
+			'${storageBase}mods/videos/${videoFileName}.${Paths.VIDEO_EXT}',
+			'${storageBase}videos/${videoFileName}.mkv'
 		];
 		for (candidate in candidates)
 		{
