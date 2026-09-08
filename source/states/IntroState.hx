@@ -75,7 +75,8 @@ class IntroState extends MusicBeatState
 		videoSprite.play();
 
 		#if mobile
-		addTouchPad('LEFT_RIGHT', 'A_B'); // hold A to skip
+		MobileData.init();
+		addTouchPad('LEFT_FULL', 'A_B'); // hold A to skip
 		if (touchPad != null)
 			touchPad.alpha = 0.5;
 		#end
