@@ -276,7 +276,9 @@ class Paths
 		}
 
 		// Check for deprecated texture2D (should be texture in GLSL 300+)
-		if (lower.indexOf('#version 300') != -1 || lower.indexOf('#version 330') != -1)
+		// Only warn if shader explicitly targets GLSL 300/330
+		var isGLSL300:Bool = lower.indexOf('#version 300') != -1 || lower.indexOf('#version 330') != -1;
+		if (isGLSL300)
 		{
 			if (lower.indexOf('texture2d(') != -1)
 				issues.push('texture2D() is deprecated in GLSL 300+, use texture() instead');

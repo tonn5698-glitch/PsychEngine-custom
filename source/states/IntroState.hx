@@ -76,7 +76,7 @@ class IntroState extends MusicBeatState
 
 		#if mobile
 		MobileData.init();
-		addTouchPad('SKIP', 'A_B'); // minimal skip-only button
+		addTouchPad('NONE', 'SINGLE'); // single A button, no d-pad
 		if (touchPad != null)
 			touchPad.alpha = 0.5;
 		#end

@@ -51,10 +51,21 @@ class FlxShader extends OriginalFlxShader
 		@:privateAccess
 		var gl = __context.gl;
 
+		// Only use GLSL 300 if the shader explicitly declares it.
+		// Shaders without a version directive default to GLSL 120 (compatible with most mods).
+		var isGLSL300:Bool = glVertexSource.indexOf('#version 300') != -1
+			|| glVertexSource.indexOf('#version 330') != -1
+			|| glFragmentSource.indexOf('#version 300') != -1
+			|| glFragmentSource.indexOf('#version 330') != -1;
+
 		#if lime_opengles
-		var prefix = "#version 300 es\n";
+		var prefix:String;
+		if (isGLSL300)
+			prefix = "#version 300 es\n";
+		else
+			prefix = "";
 		#else
-		var prefix = "#version 330\n";
+		var prefix:String = "";
 		#end
 
 		#if (js && html5)
@@ -70,13 +81,23 @@ class FlxShader extends OriginalFlxShader
 		#end
 
 		#if lime_opengles
-		prefix += 'out vec4 output_FragColor;\n';
-		var vertex = prefix
-			+ glVertexSource.replace("attribute", "in")
-				.replace("varying", "out")
-				.replace("texture2D", "texture")
-				.replace("gl_FragColor", "output_FragColor");
-		var fragment = prefix + glFragmentSource.replace("varying", "in").replace("texture2D", "texture").replace("gl_FragColor", "output_FragColor");
+		var vertex:String;
+		var fragment:String;
+		if (isGLSL300)
+		{
+			prefix += 'out vec4 output_FragColor;\n';
+			vertex = prefix
+				+ glVertexSource.replace("attribute", "in")
+					.replace("varying", "out")
+					.replace("texture2D", "texture")
+					.replace("gl_FragColor", "output_FragColor");
+			fragment = prefix + glFragmentSource.replace("varying", "in").replace("texture2D", "texture").replace("gl_FragColor", "output_FragColor");
+		}
+		else
+		{
+			vertex = prefix + glVertexSource;
+			fragment = prefix + glFragmentSource;
+		}
 		#else
 		var vertex = prefix + glVertexSource;
 		var fragment = prefix + glFragmentSource;

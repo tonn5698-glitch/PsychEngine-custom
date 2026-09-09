@@ -40,10 +40,16 @@ class ErrorHandledShader extends FlxShader implements IErrorHandler
 		var errMsg:String = "";
 		var dateNow:String = Date.now().toString().replace(" ", "_").replace(":", "'");
 
-		if (!FileSystem.exists('./logs/'))
-			FileSystem.createDirectory('./logs/');
+		#if android
+		var logsDir:String = mobile.backend.StorageUtil.getExternalStorageDirectory() + 'logs/';
+		#else
+		var logsDir:String = './logs/';
+		#end
 
-		var crashLogPath:String = './logs/shader_${shaderName}_${dateNow}.txt';
+		if (!FileSystem.exists(logsDir))
+			FileSystem.createDirectory(logsDir);
+
+		var crashLogPath:String = logsDir + 'shader_${shaderName}_${dateNow}.txt';
 		File.saveContent(crashLogPath, error);
 		Application.current.window.alert('Error log saved at: $crashLogPath', alertTitle);
 		#else
