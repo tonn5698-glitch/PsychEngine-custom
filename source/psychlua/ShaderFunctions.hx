@@ -154,6 +154,62 @@ class ShaderFunctions
 			#end
 		});
 
+		Lua_helper.add_callback(lua, "addCameraFilter", function(camera:String, shader:String) {
+			if(!ClientPrefs.data.shaders) return false;
+
+			#if (!flash && sys)
+			var cam:FlxCamera = LuaUtils.getObjectDirectly(camera);
+			if(cam == null)
+			{
+				switch(camera.toLowerCase())
+				{
+					case 'game' | 'camgame': cam = FlxG.camera;
+					case 'hud' | 'camhud' | 'camother': cam = FlxG.camera != null ? FlxG.cameras.list[FlxG.cameras.list.length - 1] : null;
+					case 'camfullscreen': cam = FlxG.cameras.list.length > 1 ? FlxG.cameras.list[1] : null;
+				}
+			}
+			if(cam == null)
+			{
+				FunkinLua.luaTrace('addCameraFilter: Camera "$camera" not found!', false, false, FlxColor.RED);
+				return false;
+			}
+			if(!funk.runtimeShaders.exists(shader) && !funk.initLuaShader(shader))
+			{
+				FunkinLua.luaTrace('addCameraFilter: Shader "$shader" is missing!', false, false, FlxColor.RED);
+				return false;
+			}
+			var arr:Array<String> = funk.runtimeShaders.get(shader);
+			var shaderObj = new shaders.ErrorHandledShader.ErrorHandledRuntimeShader(shader, arr[0], arr[1]);
+			var filterObj = new ShaderFilter(shaderObj);
+			if(cam.filters == null) cam.filters = [];
+			cam.filters.push(filterObj);
+			return true;
+			#else
+			FunkinLua.luaTrace("addCameraFilter: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
+			return false;
+			#end
+		});
+
+		Lua_helper.add_callback(lua, "clearCameraFilters", function(camera:String) {
+			#if (!flash && sys)
+			var cam:FlxCamera = LuaUtils.getObjectDirectly(camera);
+			if(cam == null)
+			{
+				switch(camera.toLowerCase())
+				{
+					case 'game' | 'camgame': cam = FlxG.camera;
+					case 'hud' | 'camhud' | 'camother': cam = FlxG.camera != null ? FlxG.cameras.list[FlxG.cameras.list.length - 1] : null;
+					case 'camfullscreen': cam = FlxG.cameras.list.length > 1 ? FlxG.cameras.list[1] : null;
+				}
+			}
+			if(cam != null) cam.filters = [];
+			return true;
+			#else
+			FunkinLua.luaTrace("clearCameraFilters: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
+			return false;
+			#end
+		});
+
 
 		Lua_helper.add_callback(lua, "getShaderBool", function(obj:String, prop:String) {
 			#if (!flash && MODS_ALLOWED && sys)

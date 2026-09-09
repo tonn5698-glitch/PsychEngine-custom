@@ -898,7 +898,7 @@ class FunkinLua {
 
 		Lua_helper.add_callback(lua, "setCameraBounds", function(name:String, x:Float, y:Float, width:Float, height:Float) {
 			var cam:FlxCamera = LuaUtils.cameraFromString(name);
-			cam.setBounds(x, y, width, height);
+			cam.scroll.set(x, y);
 		});
 
 		Lua_helper.add_callback(lua, "setCameraPosition", function(name:String, x:Float, y:Float) {
@@ -925,30 +925,6 @@ class FunkinLua {
 		Lua_helper.add_callback(lua, "setCameraSize", function(name:String, width:Int, height:Int) {
 			var cam:FlxCamera = LuaUtils.cameraFromString(name);
 			cam.setSize(width, height);
-		});
-
-		Lua_helper.add_callback(lua, "addCameraFilter", function(name:String, filter:String) {
-			#if (!flash && sys)
-			var cam:FlxCamera = LuaUtils.cameraFromString(name);
-			if (cam == null) return false;
-			if (!funk.runtimeShaders.exists(filter) && !funk.initLuaShader(filter)) {
-				FunkinLua.luaTrace('addCameraFilter: Shader "$filter" is missing!', false, false, FlxColor.RED);
-				return false;
-			}
-			var arr:Array<String> = funk.runtimeShaders.get(filter);
-			var shaderObj = new shaders.ErrorHandledShader.ErrorHandledRuntimeShader(filter, arr[0], arr[1]);
-			var filterObj = new openfl.filters.ShaderFilter(shaderObj);
-			if (cam.filters == null) cam.filters = [];
-			cam.filters.push(filterObj);
-			return true;
-			#else
-			return false;
-			#end
-		});
-
-		Lua_helper.add_callback(lua, "clearCameraFilters", function(name:String) {
-			var cam:FlxCamera = LuaUtils.cameraFromString(name);
-			if (cam != null) cam.filters = [];
 		});
 
 		Lua_helper.add_callback(lua, "cameraShake", function(camera:String, intensity:Float, duration:Float) {
