@@ -73,13 +73,6 @@ class IntroState extends MusicBeatState
 		videoSprite.onSkip = goToTitle;
 		add(videoSprite);
 		videoSprite.play();
-
-		#if mobile
-		MobileData.init();
-		addTouchPad('NONE', 'SINGLE'); // single A button, no d-pad
-		if (touchPad != null)
-			touchPad.alpha = 0.5;
-		#end
 		#else
 		#if sys dbg('[IntroState] VIDEOS_ALLOWED = NO'); #end
 		goToTitle();
