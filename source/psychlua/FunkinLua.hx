@@ -872,6 +872,85 @@ class FunkinLua {
 		Lua_helper.add_callback(lua, "getCameraFollowX", () -> game.camFollow.x);
 		Lua_helper.add_callback(lua, "getCameraFollowY", () -> game.camFollow.y);
 
+		// Camera creation/destruction
+		Lua_helper.add_callback(lua, "createCamera", function(name:String, ?x:Float = 0, ?y:Float = 0, ?width:Int = 0, ?height:Int = 0, ?bgColor:String = '0x00000000') {
+			if (width <= 0) width = FlxG.width;
+			if (height <= 0) height = FlxG.height;
+
+			var cam:FlxCamera = new FlxCamera(x, y, width, height);
+			cam.bgColor = CoolUtil.colorFromString(bgColor);
+			FlxG.cameras.add(cam, false);
+			MusicBeatState.getVariables().set(name, cam);
+			return name;
+		});
+
+		Lua_helper.add_callback(lua, "removeCamera", function(name:String) {
+			var cam:FlxCamera = MusicBeatState.getVariables().get(name);
+			if (cam == null || !Std.isOfType(cam, FlxCamera)) {
+				FunkinLua.luaTrace('removeCamera: Camera "$name" not found!', false, false, FlxColor.RED);
+				return false;
+			}
+			FlxG.cameras.remove(cam);
+			cam.destroy();
+			MusicBeatState.getVariables().remove(name);
+			return true;
+		});
+
+		Lua_helper.add_callback(lua, "setCameraBounds", function(name:String, x:Float, y:Float, width:Float, height:Float) {
+			var cam:FlxCamera = LuaUtils.cameraFromString(name);
+			cam.setBounds(x, y, width, height);
+		});
+
+		Lua_helper.add_callback(lua, "setCameraPosition", function(name:String, x:Float, y:Float) {
+			var cam:FlxCamera = LuaUtils.cameraFromString(name);
+			cam.x = x;
+			cam.y = y;
+		});
+
+		Lua_helper.add_callback(lua, "getCameraPosition", function(name:String) {
+			var cam:FlxCamera = LuaUtils.cameraFromString(name);
+			return [cam.x, cam.y];
+		});
+
+		Lua_helper.add_callback(lua, "setCameraZoom", function(name:String, zoom:Float) {
+			var cam:FlxCamera = LuaUtils.cameraFromString(name);
+			cam.zoom = zoom;
+		});
+
+		Lua_helper.add_callback(lua, "getCameraZoom", function(name:String) {
+			var cam:FlxCamera = LuaUtils.cameraFromString(name);
+			return cam.zoom;
+		});
+
+		Lua_helper.add_callback(lua, "setCameraSize", function(name:String, width:Int, height:Int) {
+			var cam:FlxCamera = LuaUtils.cameraFromString(name);
+			cam.setSize(width, height);
+		});
+
+		Lua_helper.add_callback(lua, "addCameraFilter", function(name:String, filter:String) {
+			#if (!flash && sys)
+			var cam:FlxCamera = LuaUtils.cameraFromString(name);
+			if (cam == null) return false;
+			if (!funk.runtimeShaders.exists(filter) && !funk.initLuaShader(filter)) {
+				FunkinLua.luaTrace('addCameraFilter: Shader "$filter" is missing!', false, false, FlxColor.RED);
+				return false;
+			}
+			var arr:Array<String> = funk.runtimeShaders.get(filter);
+			var shaderObj = new shaders.ErrorHandledShader.ErrorHandledRuntimeShader(filter, arr[0], arr[1]);
+			var filterObj = new openfl.filters.ShaderFilter(shaderObj);
+			if (cam.filters == null) cam.filters = [];
+			cam.filters.push(filterObj);
+			return true;
+			#else
+			return false;
+			#end
+		});
+
+		Lua_helper.add_callback(lua, "clearCameraFilters", function(name:String) {
+			var cam:FlxCamera = LuaUtils.cameraFromString(name);
+			if (cam != null) cam.filters = [];
+		});
+
 		Lua_helper.add_callback(lua, "cameraShake", function(camera:String, intensity:Float, duration:Float) {
 			LuaUtils.cameraFromString(camera).shake(intensity, duration);
 		});
