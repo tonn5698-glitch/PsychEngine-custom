@@ -164,6 +164,8 @@ class HScript extends Iris
 		set('StorageUtil', StorageUtil);
 		set('Conductor', Conductor);
 		set('ClientPrefs', ClientPrefs);
+		set('FunkinSave', funkin.savedata.FunkinSave);
+		set('Highscore', backend.Highscore);
 		#if ACHIEVEMENTS_ALLOWED
 		set('Achievements', Achievements);
 		#end
@@ -172,6 +174,10 @@ class HScript extends Iris
 		set('Note', objects.Note);
 		set('CustomSubstate', CustomSubstate);
 		set('CustomState', psychlua.CustomState);
+		// CNE shim classes
+		set('FunkinText', funkin.backend.FunkinText);
+		set('FunkinSprite', funkin.backend.FunkinSprite);
+		set('FlxBackdrop', flixel.addons.display.FlxBackdrop);
 		#if (!flash && sys)
 		set('FlxRuntimeShader', flixel.addons.display.FlxRuntimeShader);
 		set('ErrorHandledRuntimeShader', shaders.ErrorHandledShader.ErrorHandledRuntimeShader);
