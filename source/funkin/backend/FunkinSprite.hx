@@ -22,9 +22,14 @@ class FunkinSprite extends flixel.FlxSprite
 	{
 		if (animation != null)
 		{
-			var list:Array<String> = animation.getAnimationList();
-			if (list == null || list.length == 0 || list.indexOf(name) == -1)
+			if (animation.getAnimationList().length == 0)
 				return;
+			var found:Bool = false;
+			for (anim in animation.getAnimationList())
+			{
+				if (anim.name == name) { found = true; break; }
+			}
+			if (!found) return;
 			animation.play(name, forced, reverse, startFrame);
 		}
 	}
@@ -38,9 +43,11 @@ class FunkinSprite extends flixel.FlxSprite
 	public function hasAnim(name:String):Bool
 	{
 		if (animation == null) return false;
-		var list:Array<String> = animation.getAnimationList();
-		if (list == null) return false;
-		return list.indexOf(name) != -1;
+		for (anim in animation.getAnimationList())
+		{
+			if (anim.name == name) return true;
+		}
+		return false;
 	}
 
 	public function getAnim():String
