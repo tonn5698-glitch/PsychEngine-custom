@@ -567,8 +567,29 @@ class Paths
 	}
 
 	#if MODS_ALLOWED
+	// ===== MULTI MOD FOLDERS =====
+	// Danh sách các thư mục root mod (có thể thêm mods3, mods4...)
+	public static var modRootDirs:Array<String> = ['mods', 'mods1', 'mods2'];
+	// Thư mục root hiện đang active (index trong modRootDirs)
+	public static var currentModRoot:String = 'mods';
+
 	inline static public function mods(key:String = '')
-		return #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end 'mods/' + key;
+		return #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end currentModRoot + '/' + key;
+
+	// Trả về root path hiện tại (không có key)
+	inline static public function modsRoot():String
+		return #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end currentModRoot + '/';
+
+	// Trả về root path theo tên
+	inline static public function modsRootByName(root:String):String
+		return #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end root + '/';
+
+	// Switch root mod
+	public static function switchModRoot(newRoot:String):Void
+	{
+		if (modRootDirs.contains(newRoot))
+			currentModRoot = newRoot;
+	}
 
 	inline static public function modsJson(key:String)
 		return modFolders('data/' + key + '.json');
@@ -593,36 +614,38 @@ class Paths
 
 	static public function modFolders(key:String)
 	{
+		// 1. Check currentModDirectory trong TẤT CẢ root dirs
+		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
+		{
+			for (root in modRootDirs)
+			{
+				var fileToCheck:String = modsRootByName(root) + Mods.currentModDirectory + '/' + key;
+				if(FileSystem.exists(fileToCheck))
+					return fileToCheck;
+			}
+		}
+
+		// 2. Check global mods trong TẤT CẢ root dirs
+		for(mod in Mods.getGlobalMods())
+		{
+			for (root in modRootDirs)
+			{
+				var fileToCheck:String = modsRootByName(root) + mod + '/' + key;
+				if(FileSystem.exists(fileToCheck))
+					return fileToCheck;
+			}
+		}
+
+		// 3. Fallback: currentModDirectory trong root hiện tại
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
 		{
 			var fileToCheck:String = mods(Mods.currentModDirectory + '/' + key);
 			if(FileSystem.exists(fileToCheck))
 				return fileToCheck;
-			#if linux
-			else
-			{
-				var newPath:String = findFile(key);
-				if (newPath != null)
-					return newPath;
-			}
-			#end
 		}
 
-		for(mod in Mods.getGlobalMods())
-		{
-			var fileToCheck:String = mods(mod + '/' + key);
-			if(FileSystem.exists(fileToCheck))
-				return fileToCheck;
-			#if linux
-			else
-			{
-				var newPath:String = findFile(key);
-				if (newPath != null)
-					return newPath;
-			}
-			#end
-		}
-		return (#if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end 'mods/' + key);
+		// 4. Fallback cuối
+		return mods(key);
 	}
 
 	#if linux

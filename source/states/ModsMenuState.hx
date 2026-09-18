@@ -26,7 +26,8 @@ class ModsMenuState extends MusicBeatState
 
 	var bgList:FlxSprite;
 	var buttonReload:MenuButton;
-	//var buttonModFolder:MenuButton;
+	var buttonModRoot:MenuButton;
+	var modRootText:FlxText;
 	var buttonEnableAll:MenuButton;
 	var buttonDisableAll:MenuButton;
 	var buttons:Array<MenuButton> = [];
@@ -112,16 +113,25 @@ class ModsMenuState extends MusicBeatState
 		add(buttonReload);
 		
 		var myY = buttonReload.y + buttonReload.bg.height + 20;
-		/*buttonModFolder = new MenuButton(buttonX, myY, buttonWidth, buttonHeight, "MODS FOLDER", function() {
-			var modFolder = Paths.mods();
-			if(!FileSystem.exists(modFolder))
-			{
-				trace('created missing folder');
-				FileSystem.createDirectory(modFolder);
-			}
-			CoolUtil.openFolder(modFolder);
+
+		// MOD ROOT SWITCHER
+		modRootText = new FlxText(buttonX, myY, buttonWidth, 'Root: ${Paths.currentModRoot}', 20);
+		modRootText.setFormat(Paths.font("vcr.ttf"), 18, FlxColor.YELLOW, CENTER);
+		add(modRootText);
+
+		buttonModRoot = new MenuButton(buttonX, myY + 25, buttonWidth, buttonHeight - 20, 'SWITCH ROOT', function() {
+			// Cycle: mods → mods1 → mods2 → mods
+			var roots = Paths.modRootDirs;
+			var curIdx = roots.indexOf(Paths.currentModRoot);
+			curIdx = (curIdx + 1) % roots.length;
+			Paths.switchModRoot(roots[curIdx]);
+			modRootText.text = 'Root: ${Paths.currentModRoot}';
+			reload();
+			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		});
-		add(buttonModFolder);*/
+		add(buttonModRoot);
+
+		myY = buttonModRoot.y + buttonModRoot.bg.height + 20;
 
 		buttonEnableAll = new MenuButton(buttonX, myY, buttonWidth, buttonHeight, Language.getPhrase('enable_all_button', 'ENABLE ALL'), function() {
 			buttonEnableAll.ignoreCheck = false;
