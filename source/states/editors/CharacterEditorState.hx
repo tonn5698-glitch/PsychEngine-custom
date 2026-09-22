@@ -199,7 +199,6 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 		// Xóa code cursor cũ ở MusicBeatState (nếu có)
 		// Cursor giờ được tạo trong MusicBeatState.create()
-	}
 
 		if(ClientPrefs.data.cacheOnGPU) Paths.clearUnusedMemory();
 
