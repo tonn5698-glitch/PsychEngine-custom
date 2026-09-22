@@ -37,6 +37,7 @@ import states.TitleState;
 	public var framerate:Int = 60;
 	public var camZooms:Bool = true;
 	public var hideHud:Bool = false;
+	public var modFreeplaySwitch:Bool = false; // Bật/tắt chuyển mod trong Freeplay
 
 	// Optimization (ported from FNF-JS-Engine OptimizationSubState)
 	public var enableGC:Bool = true;

@@ -64,6 +64,12 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
+		var option:Option = new Option('Mod Freeplay Switch',
+			"If checked, Freeplay will show songs from only 2 mods\nand a button will appear to switch between them.",
+			'modFreeplaySwitch',
+			BOOL);
+		addOption(option);
+
 		var option:Option = new Option('Hitsound Volume',
 			'Funny notes does \"Tick!\" when you hit them.',
 			'hitsoundVolume',

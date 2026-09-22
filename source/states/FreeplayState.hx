@@ -28,6 +28,26 @@ class FreeplayState extends MusicBeatState
 	var curDifficulty:Int = -1;
 	private static var lastDifficultyName:String = Difficulty.getDefault();
 
+	// ===== MOD FREEPLAY SWITCH =====
+	public static var availableMods:Array<String> = [];
+	public static var currentModIdx:Int = 0;
+	public static var freeplayFilterMod:String = ''; // '' = hiện tất cả
+
+	function getEnabledMods():Array<String>
+	{
+		var mods:Array<String> = [];
+		var list = Mods.parseList();
+		if (list != null && list.enabled != null)
+		{
+			for (mod in list.enabled)
+			{
+				if (mod != null && mod.length > 0 && !mods.contains(mod))
+					mods.push(mod);
+			}
+		}
+		return mods;
+	}
+
 	var scoreBG:FlxSprite;
 	var scoreText:FlxText;
 	var diffText:FlxText;
@@ -112,6 +132,12 @@ class FreeplayState extends MusicBeatState
 			WeekData.setDirectoryFromWeek(leWeek);
 			for (song in leWeek.songs)
 			{
+				// MOD FREEPLAY SWITCH: chỉ hiện bài của mod đang chọn
+				if (ClientPrefs.data.modFreeplaySwitch && freeplayFilterMod.length > 0)
+				{
+					if (Mods.currentModDirectory != freeplayFilterMod) continue;
+				}
+
 				var colors:Array<Int> = song[2];
 				if(colors == null || colors.length < 3)
 				{
@@ -209,10 +235,22 @@ class FreeplayState extends MusicBeatState
 		player = new MusicPlayer(this);
 		add(player);
 		
+		// MOD FREEPLAY SWITCH: lấy danh sách mod enabled
+		if (ClientPrefs.data.modFreeplaySwitch)
+		{
+			availableMods = getEnabledMods();
+			if (availableMods.length > 0 && freeplayFilterMod.length == 0)
+				freeplayFilterMod = availableMods[0]; // Chọn mod đầu tiên mặc định
+		}
+
 		changeSelection();
 		updateTexts();
 
-		addTouchPad('LEFT_FULL', 'A_B_C_X_Y_Z');
+		// Chọn touchpad config: có nút M nếu bật mod switch
+		if (ClientPrefs.data.modFreeplaySwitch)
+			addTouchPad('LEFT_FULL', 'A_B_C_X_Y_Z_M');
+		else
+			addTouchPad('LEFT_FULL', 'A_B_C_X_Y_Z');
 		super.create();
 	}
 
@@ -222,7 +260,10 @@ class FreeplayState extends MusicBeatState
 		persistentUpdate = true;
 		super.closeSubState();
 		removeTouchPad();
-		addTouchPad('LEFT_FULL', 'A_B_C_X_Y_Z');
+		if (ClientPrefs.data.modFreeplaySwitch)
+			addTouchPad('LEFT_FULL', 'A_B_C_X_Y_Z_M');
+		else
+			addTouchPad('LEFT_FULL', 'A_B_C_X_Y_Z');
 	}
 
 	public function addSong(songName:String, weekNum:Int, songCharacter:String, color:Int)
@@ -354,6 +395,28 @@ class FreeplayState extends MusicBeatState
 		{
 			persistentUpdate = false;
 			openSubState(new GameplayChangersSubstate());
+			removeTouchPad();
+		}
+
+		// MOD FREEPLAY SWITCH: nút M mở popup chuyển mod
+		if (ClientPrefs.data.modFreeplaySwitch && touchPad.buttonE.justPressed && !player.playingMusic)
+		{
+			persistentUpdate = false;
+			openSubState(new FreeplayModSwitchSubState(freeplayFilterMod, function(newMod:String) {
+				freeplayFilterMod = newMod;
+				MusicBeatState.switchState(new FreeplayState());
+			}));
+			removeTouchPad();
+		}
+
+		// Keyboard shortcut (desktop): TAB mở popup chuyển mod
+		if (ClientPrefs.data.modFreeplaySwitch && FlxG.keys.justPressed.TAB && !player.playingMusic)
+		{
+			persistentUpdate = false;
+			openSubState(new FreeplayModSwitchSubState(freeplayFilterMod, function(newMod:String) {
+				freeplayFilterMod = newMod;
+				MusicBeatState.switchState(new FreeplayState());
+			}));
 			removeTouchPad();
 		}
 		else if(FlxG.keys.justPressed.SPACE || touchPad.buttonX.justPressed)
