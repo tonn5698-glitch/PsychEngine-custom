@@ -61,7 +61,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 	var cameraPosition:Point = new Point();
 	var isDragging:Bool = false;
 	var cameraLocked:Bool = false; // Khóa camera: drag không di chuyển
-	var cursorIndicator:FlxSprite; // Cursor nhấp nháy ở góc
+	// cursorIndicator đã khai báo trong MusicBeatState (base class)
 
 	public function new(char:String = null, goToPlayState:Bool = true)
 	{
@@ -172,33 +172,13 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		addTouchPadCamera();
 
 		// Cursor indicator nhấp nháy ở góc phải dưới (hình mũi tên)
-		cursorIndicator = new FlxSprite(FlxG.width - 40, FlxG.height - 50);
-		cursorIndicator.makeGraphic(20, 20, 0x00FFFFFF);
-		var g = cursorIndicator.pixels;
-		g.lock();
-		var cursorBmp = new openfl.display.BitmapData(20, 20, true, 0);
-		var cursorGfx = new openfl.display.Graphics();
-		cursorGfx.beginFill(0xFFFFFF);
-		cursorGfx.moveTo(0, 0);
-		cursorGfx.lineTo(16, 10);
-		cursorGfx.lineTo(5, 10);
-		cursorGfx.lineTo(5, 18);
-		cursorGfx.lineTo(0, 13);
-		cursorGfx.endFill();
-		cursorGfx.lineStyle(1, 0x000000);
-		cursorGfx.moveTo(0, 0); cursorGfx.lineTo(16, 10); cursorGfx.lineTo(5, 10);
-		cursorGfx.lineTo(5, 18); cursorGfx.lineTo(0, 13); cursorGfx.lineTo(0, 0);
-		cursorBmp.draw(cursorGfx);
-		g.copyPixels(cursorBmp, cursorBmp.rect, new openfl.geom.Point(0, 0));
-		cursorBmp.dispose();
-		g.unlock();
-		cursorIndicator.scrollFactor.set();
-		cursorIndicator.alpha = 0.8;
-		cursorIndicator.cameras = [camHUD];
-		add(cursorIndicator);
-
-		// Xóa code cursor cũ ở MusicBeatState (nếu có)
-		// Cursor giờ được tạo trong MusicBeatState.create()
+		// cursorIndicator được tạo trong MusicBeatState.create()
+		if (cursorIndicator != null)
+		{
+			cursorIndicator.x = FlxG.width - 40;
+			cursorIndicator.y = FlxG.height - 50;
+			cursorIndicator.cameras = [camHUD];
+		}
 
 		if(ClientPrefs.data.cacheOnGPU) Paths.clearUnusedMemory();
 

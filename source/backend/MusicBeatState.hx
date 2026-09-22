@@ -195,13 +195,16 @@ class MusicBeatState extends FlxState
 		if (cursorBmp == null)
 		{
 			cursorBmp = new openfl.display.BitmapData(20, 20, true, 0);
-			var g = new openfl.display.Graphics();
-			g.beginFill(0xFFFFFF);
-			g.moveTo(0, 0); g.lineTo(16, 10); g.lineTo(5, 10); g.lineTo(5, 18); g.lineTo(0, 13); g.endFill();
-			g.lineStyle(1, 0x000000);
-			g.moveTo(0, 0); g.lineTo(16, 10); g.lineTo(5, 10); g.lineTo(5, 18); g.lineTo(0, 13); g.lineTo(0, 0);
-			cursorBmp.draw(g);
-			g = null;
+			var shape = new openfl.display.Shape();
+			shape.graphics.beginFill(0xFFFFFF);
+			shape.graphics.moveTo(0, 0); shape.graphics.lineTo(16, 10);
+			shape.graphics.lineTo(5, 10); shape.graphics.lineTo(5, 18); shape.graphics.lineTo(0, 13);
+			shape.graphics.endFill();
+			shape.graphics.lineStyle(1, 0x000000);
+			shape.graphics.moveTo(0, 0); shape.graphics.lineTo(16, 10);
+			shape.graphics.lineTo(5, 10); shape.graphics.lineTo(5, 18);
+			shape.graphics.lineTo(0, 13); shape.graphics.lineTo(0, 0);
+			cursorBmp.draw(shape);
 		}
 
 		return camera;
