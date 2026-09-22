@@ -171,11 +171,27 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
 		addTouchPadCamera();
 
-		// Cursor indicator nhấp nháy ở góc phải dưới
-		cursorIndicator = new FlxSprite(FlxG.width - 50, FlxG.height - 50);
-		cursorIndicator.makeGraphic(16, 16, FlxColor.WHITE);
+		// Cursor indicator nhấp nháy ở góc phải dưới (hình mũi tên)
+		cursorIndicator = new FlxSprite(FlxG.width - 40, FlxG.height - 50);
+		// Vẽ mũi tên đơn giản bằng FlxSprite
+		cursorIndicator.makeGraphic(20, 20, FlxColor.TRANSPARENT);
+		var g = cursorIndicator.pixels;
+		g.lock();
+		var shape = new openfl.display.Graphics();
+		shape.beginFill(0xFFFFFF);
+		shape.moveTo(0, 0);
+		shape.lineTo(16, 10);
+		shape.lineTo(5, 10);
+		shape.lineTo(5, 18);
+		shape.lineTo(0, 13);
+		shape.endFill();
+		shape.lineStyle(1, 0x000000);
+		shape.moveTo(0, 0); shape.lineTo(16, 10); shape.lineTo(5, 10); shape.lineTo(5, 18); shape.lineTo(0, 13); shape.lineTo(0, 0);
+		g.draw(new openfl.display.BitmapData(20, 20, true, 0));
+		g.draw(shape);
+		g.unlock();
 		cursorIndicator.scrollFactor.set();
-		cursorIndicator.alpha = 0.6;
+		cursorIndicator.alpha = 0.8;
 		cursorIndicator.cameras = [camHUD];
 		add(cursorIndicator);
 
