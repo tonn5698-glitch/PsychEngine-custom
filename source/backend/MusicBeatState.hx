@@ -145,6 +145,8 @@ class MusicBeatState extends FlxState
 	}
 
 	var _psychCameraInitialized:Bool = false;
+	public static var cursorBmp:openfl.display.BitmapData = null;
+	public var cursorIndicator:flixel.FlxSprite;
 
 	public var variables:Map<String, Dynamic> = new Map<String, Dynamic>();
 	public static function getVariables()
@@ -160,6 +162,17 @@ class MusicBeatState extends FlxState
 		#end
 
 		if(!_psychCameraInitialized) initPsychCamera();
+
+		// Tạo cursor indicator nếu chưa có
+		if (cursorBmp != null && cursorIndicator == null)
+		{
+			cursorIndicator = new flixel.FlxSprite(FlxG.width - 40, FlxG.height - 50);
+			cursorIndicator.pixels.copyPixels(cursorBmp, cursorBmp.rect, new openfl.geom.Point(0, 0));
+			cursorIndicator.scrollFactor.set();
+			cursorIndicator.alpha = 0.8;
+			cursorIndicator.visible = false;
+			add(cursorIndicator);
+		}
 
 		super.create();
 
@@ -177,12 +190,34 @@ class MusicBeatState extends FlxState
 		FlxG.cameras.setDefaultDrawTarget(camera, true);
 		_psychCameraInitialized = true;
 		//trace('initialized psych camera ' + Sys.cpuTime());
+
+		// Tạo cursor indicator (chỉ 1 lần)
+		if (cursorBmp == null)
+		{
+			cursorBmp = new openfl.display.BitmapData(20, 20, true, 0);
+			var g = new openfl.display.Graphics();
+			g.beginFill(0xFFFFFF);
+			g.moveTo(0, 0); g.lineTo(16, 10); g.lineTo(5, 10); g.lineTo(5, 18); g.lineTo(0, 13); g.endFill();
+			g.lineStyle(1, 0x000000);
+			g.moveTo(0, 0); g.lineTo(16, 10); g.lineTo(5, 10); g.lineTo(5, 18); g.lineTo(0, 13); g.lineTo(0, 0);
+			cursorBmp.draw(g);
+			g = null;
+		}
+
 		return camera;
 	}
 
 	public static var timePassedOnState:Float = 0;
 	override function update(elapsed:Float)
 	{
+		// Cursor indicator nhấp nháy khi có UI interactive
+		if (cursorIndicator != null)
+		{
+			cursorIndicator.visible = FlxG.mouse.visible;
+			if (cursorIndicator.visible)
+				cursorIndicator.alpha = 0.4 + Math.abs(Math.sin(FlxG.game.ticks / 500.0)) * 0.6;
+		}
+
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 		if (PsychGlobalScript.instance != null) PsychGlobalScript.instance.callOnScripts('onUpdate', [elapsed]);
 		#end

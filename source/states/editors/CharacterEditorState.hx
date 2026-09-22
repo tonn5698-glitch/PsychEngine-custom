@@ -173,34 +173,33 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 		// Cursor indicator nhấp nháy ở góc phải dưới (hình mũi tên)
 		cursorIndicator = new FlxSprite(FlxG.width - 40, FlxG.height - 50);
-		// Vẽ mũi tên đơn giản bằng FlxSprite
-		cursorIndicator.makeGraphic(20, 20, FlxColor.TRANSPARENT);
+		cursorIndicator.makeGraphic(20, 20, 0x00FFFFFF);
 		var g = cursorIndicator.pixels;
 		g.lock();
-		var shape = new openfl.display.Graphics();
-		shape.beginFill(0xFFFFFF);
-		shape.moveTo(0, 0);
-		shape.lineTo(16, 10);
-		shape.lineTo(5, 10);
-		shape.lineTo(5, 18);
-		shape.lineTo(0, 13);
-		shape.endFill();
-		shape.lineStyle(1, 0x000000);
-		shape.moveTo(0, 0); shape.lineTo(16, 10); shape.lineTo(5, 10); shape.lineTo(5, 18); shape.lineTo(0, 13); shape.lineTo(0, 0);
-		g.draw(new openfl.display.BitmapData(20, 20, true, 0));
-		g.draw(shape);
+		var cursorBmp = new openfl.display.BitmapData(20, 20, true, 0);
+		var cursorGfx = new openfl.display.Graphics();
+		cursorGfx.beginFill(0xFFFFFF);
+		cursorGfx.moveTo(0, 0);
+		cursorGfx.lineTo(16, 10);
+		cursorGfx.lineTo(5, 10);
+		cursorGfx.lineTo(5, 18);
+		cursorGfx.lineTo(0, 13);
+		cursorGfx.endFill();
+		cursorGfx.lineStyle(1, 0x000000);
+		cursorGfx.moveTo(0, 0); cursorGfx.lineTo(16, 10); cursorGfx.lineTo(5, 10);
+		cursorGfx.lineTo(5, 18); cursorGfx.lineTo(0, 13); cursorGfx.lineTo(0, 0);
+		cursorBmp.draw(cursorGfx);
+		g.copyPixels(cursorBmp, cursorBmp.rect, new openfl.geom.Point(0, 0));
+		cursorBmp.dispose();
 		g.unlock();
 		cursorIndicator.scrollFactor.set();
 		cursorIndicator.alpha = 0.8;
 		cursorIndicator.cameras = [camHUD];
 		add(cursorIndicator);
 
-		if (controls.mobileC)
-		{
-			FlxG.stage.addEventListener(MouseEvent.MOUSE_DOWN, onMouseEvent);
-			FlxG.stage.addEventListener(MouseEvent.MOUSE_MOVE, onMouseEvent);
-			FlxG.stage.addEventListener(MouseEvent.MOUSE_UP, onMouseEvent);
-		}
+		// Xóa code cursor cũ ở MusicBeatState (nếu có)
+		// Cursor giờ được tạo trong MusicBeatState.create()
+	}
 
 		if(ClientPrefs.data.cacheOnGPU) Paths.clearUnusedMemory();
 
