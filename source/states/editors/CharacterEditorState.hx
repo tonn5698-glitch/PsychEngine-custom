@@ -60,6 +60,8 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 	var cameraPosition:Point = new Point();
 	var isDragging:Bool = false;
+	var cameraLocked:Bool = false; // Khóa camera: drag không di chuyển
+	var cursorIndicator:FlxSprite; // Cursor nhấp nháy ở góc
 
 	public function new(char:String = null, goToPlayState:Bool = true)
 	{
@@ -157,7 +159,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		add(frameAdvanceText);
 
 		addHelpScreen();
-		FlxG.mouse.visible = true;
+		FlxG.mouse.visible = false; // Ẩn cursor trên game (mobile dùng touch)
 		FlxG.camera.zoom = 1;
 
 		makeUIMenu();
@@ -168,6 +170,14 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
 		addTouchPadCamera();
+
+		// Cursor indicator nhấp nháy ở góc phải dưới
+		cursorIndicator = new FlxSprite(FlxG.width - 50, FlxG.height - 50);
+		cursorIndicator.makeGraphic(16, 16, FlxColor.WHITE);
+		cursorIndicator.scrollFactor.set();
+		cursorIndicator.alpha = 0.6;
+		cursorIndicator.cameras = [camHUD];
+		add(cursorIndicator);
 
 		if (controls.mobileC)
 		{
@@ -496,6 +506,18 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		tab_group.add(reloadCharacter);
 		tab_group.add(templateCharacter);
 		tab_group.add(charDropDown);
+
+		// CAMERA LOCK BUTTON
+		var camLockText = new FlxText(10, 90, 120, 'Camera: UNLOCKED', 10);
+		camLockText.setFormat(null, 10, FlxColor.GREEN, LEFT);
+		var camLockBtn:PsychUIButton = new PsychUIButton(140, 88, "Lock Camera", function() {
+			cameraLocked = !cameraLocked;
+			camLockText.text = cameraLocked ? 'Camera: LOCKED' : 'Camera: UNLOCKED';
+			camLockText.color = cameraLocked ? 0xFFFF6666 : FlxColor.GREEN;
+			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
+		});
+		tab_group.add(camLockText);
+		tab_group.add(camLockBtn);
 	}
 
 	var animationDropDown:PsychUIDropDownMenu;
@@ -900,6 +922,11 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		}
 		ClientPrefs.toggleVolumeKeys(true);
 
+		// Cursor indicator nhấp nháy
+		if (cursorIndicator != null) {
+			cursorIndicator.alpha = 0.4 + Math.abs(Math.sin(FlxG.game.ticks / 500.0)) * 0.6;
+		}
+
 		var shiftMult:Float = 1;
 		var ctrlMult:Float = 1;
 		var shiftMultBig:Float = 1;
@@ -911,10 +938,12 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		if(FlxG.keys.pressed.CONTROL) ctrlMult = 0.25;
 
 		// CAMERA CONTROLS
-		if (FlxG.keys.pressed.J) FlxG.camera.scroll.x -= elapsed * 500 * shiftMult * ctrlMult;
-		if (FlxG.keys.pressed.K) FlxG.camera.scroll.y += elapsed * 500 * shiftMult * ctrlMult;
-		if (FlxG.keys.pressed.L) FlxG.camera.scroll.x += elapsed * 500 * shiftMult * ctrlMult;
-		if (FlxG.keys.pressed.I) FlxG.camera.scroll.y -= elapsed * 500 * shiftMult * ctrlMult;
+		if (!cameraLocked) {
+			if (FlxG.keys.pressed.J) FlxG.camera.scroll.x -= elapsed * 500 * shiftMult * ctrlMult;
+			if (FlxG.keys.pressed.K) FlxG.camera.scroll.y += elapsed * 500 * shiftMult * ctrlMult;
+			if (FlxG.keys.pressed.L) FlxG.camera.scroll.x += elapsed * 500 * shiftMult * ctrlMult;
+			if (FlxG.keys.pressed.I) FlxG.camera.scroll.y -= elapsed * 500 * shiftMult * ctrlMult;
+		}
 
 		var lastZoom = FlxG.camera.zoom;
 		if(FlxG.keys.justPressed.R && !FlxG.keys.pressed.CONTROL || touchPad.buttonZ.justPressed) FlxG.camera.zoom = 1;
@@ -1159,7 +1188,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		}
 		cameraFollowPointer.setPosition(offX, offY);
 
-		if(snap)
+		if(snap && !cameraLocked)
 		{
 			FlxG.camera.scroll.x = cameraFollowPointer.getMidpoint().x - FlxG.width/2;
 			FlxG.camera.scroll.y = cameraFollowPointer.getMidpoint().y - FlxG.height/2;
@@ -1364,6 +1393,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 	function onMouseEvent(e:MouseEvent):Void
 	{
+		if (cameraLocked) return; // Khóa camera -> bỏ qua drag
 		if (touchPad != null && !touchPad.anyPressed([ANY]))
 			switch (e.type)
 			{
