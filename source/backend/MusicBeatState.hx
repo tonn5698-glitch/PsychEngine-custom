@@ -213,6 +213,10 @@ class MusicBeatState extends FlxState
 	public static var timePassedOnState:Float = 0;
 	override function update(elapsed:Float)
 	{
+		// Crash Handler: switch state an toàn từ error callback
+		if (CrashHandler.checkPendingCrash)
+			CrashHandler.processPendingCrash();
+
 		// Cursor indicator nhấp nháy khi có UI interactive
 		if (cursorIndicator != null)
 		{
