@@ -115,7 +115,10 @@ class HaxeLog
 			for (msg in buffer)
 				lines.push('[' + ts + '] ' + msg);
 
-			File.append(logPath, lines.join('\n') + '\n');
+			var existing:String = '';
+			if (FileSystem.exists(logPath))
+				existing = File.getContent(logPath);
+			File.saveContent(logPath, existing + lines.join('\n') + '\n');
 			buffer = [];
 			#end
 		} catch (e:Dynamic) {
