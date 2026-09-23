@@ -75,7 +75,9 @@ jobs:
         if: inputs.name == 'Android'
         uses: actions/cache@v4
         with:
-          path: export/release/android/obj
+          path: |
+            export/debug/android/obj
+            export/release/android/obj
           key: hxcpp-${{ runner.os }}-android-${{ hashFiles('setup/unix.sh') }}
           restore-keys: |
             hxcpp-${{ runner.os }}-android-
@@ -87,6 +89,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            export/debug/android/bin/.gradle
             export/release/android/bin/.gradle
           key: gradle-${{ runner.os }}-android-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |

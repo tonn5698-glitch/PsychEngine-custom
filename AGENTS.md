@@ -7,7 +7,7 @@ Custom mobile fork of Psych Engine (Haxe/Lime/FNF). Builds an APK via GitHub Act
 - **The only supported build path is GitHub Actions.** Run `git push origin main`; `.github/workflows/android-build.yml` auto-triggers and posts an `androidBuild` artifact.
 - Android release step lives in `.github/workflows/build.yml` (reusable). It builds `android -final -arm64` on `macos-15` (+ NDK r27c + Haxe 4.3.6).
 - **~20 min/build is expected.** Haxelib/hxcpp-obj/NDK/gradle caches exist but hxcpp rebuilds most objects whenever any source `.hx` changes, so cache only helps on trivial edits. Don't chase CI speed further.
-- APK artifact path: `export/release/android/bin/app/build/outputs/apk/release/*.apk`
+- APK artifact path: `export/release/android/bin/app/build/outputs/apk/release/*.apk` (release) or `export/debug/android/bin/app/build/outputs/apk/debug/*.apk` (debug builds; `BUILD_DIR` is `export/debug` when `debug` is set)
 - `mobile-release.yml` is upstream boilerplate — it has an `REPO_PATH: kittycathy233/...` guard that makes it self-abort in this repo. Do not rely on it; `android-build.yml` is the real entry.
 - Do NOT add commits solely to trigger builds (logs writes GitHub run history the other person dislikes).
 - Release: `gh release create <tag> dist/PsychEngine-release.apk --repo tonn5698-glitch/PsychEngine-custom --prerelease --generate-notes`

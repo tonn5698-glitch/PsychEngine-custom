@@ -26,4 +26,4 @@ jobs:
         setupCommand: sh ./setup/unix.sh
         buildArgs: "android -debug -arm64"
         artifactName: androidBuild
-        artifactPath: "export/release/android/bin/app/build/outputs/apk/debug/*.apk"
+        artifactPath: "export/debug/android/bin/app/build/outputs/apk/debug/*.apk"
