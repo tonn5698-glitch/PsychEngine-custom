@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/haxelib
-          key: haxelib-${{ runner.os }}-${{ hashFiles('setup/unix.sh') }}
+          key: haxelib-${{ runner.os }}-${{ hashFiles('setup/unix.sh', 'Project.xml') }}
           restore-keys: |
             haxelib-${{ runner.os }}-
 
@@ -84,10 +84,13 @@ jobs:
         if: inputs.name == 'Android'
         uses: actions/cache@v4
         with:
-          path: export/release/android/bin/.gradle
-          key: gradle-${{ runner.os }}-android
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            export/release/android/bin/.gradle
+          key: gradle-${{ runner.os }}-android-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
-            gradle-${{ runner.os }}-android
+            gradle-${{ runner.os }}-android-
 
       - name: Compile
         run: haxelib run lime build ${{ inputs.buildArgs }}

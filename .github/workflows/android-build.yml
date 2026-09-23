@@ -3,7 +3,18 @@ name: Android Build
 on:
   push:
     branches: [main]
+    paths:
+      - 'source/**'
+      - 'assets/**'
+      - 'Project.xml'
+      - 'setup/**'
+      - '.github/workflows/**'
+      - 'key.keystore'
   workflow_dispatch:
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -13,6 +24,6 @@ jobs:
         name: Android
         os: macos-15
         setupCommand: sh ./setup/unix.sh
-        buildArgs: "android -final -arm64"
+        buildArgs: "android -debug -arm64"
         artifactName: androidBuild
-        artifactPath: "export/release/android/bin/app/build/outputs/apk/release/*.apk"
+        artifactPath: "export/release/android/bin/app/build/outputs/apk/debug/*.apk"
