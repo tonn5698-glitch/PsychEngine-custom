@@ -1,7 +1,10 @@
 package states;
 
 import flixel.text.FlxText;
+import flixel.text.FlxTextAlign;
+import flixel.text.FlxTextBorderStyle;
 import flixel.FlxSprite;
+import backend.CrashHandler;
 
 /**
  * Crash Handler State — hiển thị thông tin crash thay vì đóng app.
@@ -47,14 +50,14 @@ class CrashHandlerState extends MusicBeatState
 
 		// Tiêu đề
 		var title:FlxText = new FlxText(0, 20, FlxG.width, 'GAME CRASHED', 48);
-		title.setFormat(Paths.font("vcr.ttf"), 48, 0xFFFF4444, 1, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		title.setFormat(Paths.font("vcr.ttf"), 48, 0xFFFF4444, FlxTextAlign.CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		title.borderSize = 3;
 		title.scrollFactor.set();
 		add(title);
 
 		// Thông báo lỗi
 		msgText = new FlxText(0, 80, FlxG.width - 40, lastCrashMessage, 20);
-		msgText.setFormat(Paths.font("vcr.ttf"), 20, 0xFFCCCCCC, 1, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		msgText.setFormat(Paths.font("vcr.ttf"), 20, 0xFFCCCCCC, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		msgText.borderSize = 2;
 		msgText.x = 20;
 		msgText.scrollFactor.set();
@@ -65,7 +68,7 @@ class CrashHandlerState extends MusicBeatState
 		if (displayStack.length > 2000)
 			displayStack = displayStack.substring(0, 2000) + '\n... (truncated, full log in crash/)';
 		stackText = new FlxText(0, 140, FlxG.width - 40, displayStack, 14);
-		stackText.setFormat(Paths.font("vcr.ttf"), 14, 0xFF888888, 0, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		stackText.setFormat(Paths.font("vcr.ttf"), 14, 0xFF888888, FlxTextAlign.LEFT, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		stackText.borderSize = 1;
 		stackText.x = 20;
 		stackText.scrollFactor.set();
@@ -74,7 +77,7 @@ class CrashHandlerState extends MusicBeatState
 		// Hướng dẫn
 		hintText = new FlxText(0, FlxG.height - 70, FlxG.width,
 			'BACK / B → Main Menu   |   R / A → Reload Game', 22);
-		hintText.setFormat(Paths.font("vcr.ttf"), 22, 0xFFFFAA00, 1, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		hintText.setFormat(Paths.font("vcr.ttf"), 22, 0xFFFFAA00, FlxTextAlign.CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		hintText.borderSize = 2;
 		hintText.scrollFactor.set();
 		add(hintText);
