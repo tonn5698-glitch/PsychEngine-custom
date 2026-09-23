@@ -33,7 +33,7 @@ Custom mobile fork of Psych Engine (Haxe/Lime/FNF). Builds an APK via GitHub Act
 
 ## Haxelibs & setup
 
-- Recreated by `setup/unix.sh` — uses **kittycathy233 forks** (lime, hxcpp, flixel, linc_luajit) + pinned versions (flixel-addons 3.3.2, hscript-iris 1.1.3, openfl 9.4.1, flxanimate). Never swap these for upstream openfl/lime/flixel.
+- Recreated by `setup/unix.sh` — uses **kittycathy233 forks** (lime, hxcpp, flixel, linc_luajit) + pinned versions (flixel-addons 3.2.2 — matches flixel 5.6.1; 3.3.2's FlxTiledSprite.drawDebug calls getCamerasLegacy which flixel <5.7.0 lacks, breaking -debug builds; hscript-iris 1.1.3, openfl 9.4.1, flxanimate). Never swap these for upstream openfl/lime/flixel.
 
 ## Git / push gotchas
 

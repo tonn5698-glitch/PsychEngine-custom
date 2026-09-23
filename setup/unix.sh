@@ -36,7 +36,7 @@ haxelib git hxcpp https://github.com/kittycathy233/hxcpp --quiet
 haxelib git lime https://github.com/kittycathy233/lime --quiet
 install_haxelib openfl install openfl 9.4.1 --quiet
 haxelib git flixel https://github.com/kittycathy233/flixel --quiet
-install_haxelib flixel-addons install flixel-addons 3.3.2 --quiet
+install_haxelib flixel-addons install flixel-addons 3.2.2 --quiet
 install_haxelib flixel-tools install flixel-tools 1.5.1 --quiet
 install_haxelib hscript-iris install hscript-iris 1.1.3 --quiet
 install_haxelib tjson install tjson 1.4.0 --quiet
