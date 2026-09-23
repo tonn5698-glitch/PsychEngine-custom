@@ -67,6 +67,11 @@ class MobileOptionsSubState extends BaseOptionsMenu
 			'wideScreen', BOOL);
 		option.onChange = () -> FlxG.scaleMode = new MobileScaleMode();
 		addOption(option);
+
+		option = new Option('Full Screen Mode (Restart)',
+			'If checked, the game will use the actual device resolution.\nRequires restart to take effect.',
+			'fullScreenMode', BOOL);
+		addOption(option);
 		#end
 
 		if (MobileData.mode == 3)

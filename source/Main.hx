@@ -154,7 +154,20 @@ class Main extends Sprite
 			FlxG.scaleMode = new MobileScaleMode();
 		});
 		#end
-		addChild(new FlxGame(game.width, game.height, #if COPYSTATE_ALLOWED !CopyState.checkExistingFiles() ? CopyState : #end game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
+
+		// Full Screen Mode: dùng resolution thật của device thay vì 1280x720
+		var gameW:Int = game.width;
+		var gameH:Int = game.height;
+		#if mobile
+		if (ClientPrefs.data.fullScreenMode)
+		{
+			gameW = Lib.current.stage.stageWidth;
+			gameH = Lib.current.stage.stageHeight;
+			trace('[FullScreen] Using device resolution: ${gameW}x${gameH}');
+		}
+		#end
+
+		addChild(new FlxGame(gameW, gameH, #if COPYSTATE_ALLOWED !CopyState.checkExistingFiles() ? CopyState : #end game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
