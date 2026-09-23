@@ -307,7 +307,7 @@ class FreeplayState extends MusicBeatState
 			ratingSplit[1] += '0';
 
 		var shiftMult:Int = 1;
-		if((FlxG.keys.pressed.SHIFT || touchPad.buttonZ.pressed) && !player.playingMusic) shiftMult = 3;
+		if((FlxG.keys.pressed.SHIFT || (touchPad != null && touchPad.buttonZ.pressed)) && !player.playingMusic) shiftMult = 3;
 
 		if (!player.playingMusic)
 		{
@@ -391,7 +391,7 @@ class FreeplayState extends MusicBeatState
 			}
 		}
 
-		if((FlxG.keys.justPressed.CONTROL || touchPad.buttonC.justPressed) && !player.playingMusic)
+		if((FlxG.keys.justPressed.CONTROL || (touchPad != null && touchPad.buttonC.justPressed)) && !player.playingMusic)
 		{
 			persistentUpdate = false;
 			openSubState(new GameplayChangersSubstate());
@@ -399,7 +399,7 @@ class FreeplayState extends MusicBeatState
 		}
 
 		// MOD FREEPLAY SWITCH: nút M mở popup chuyển mod
-		if (ClientPrefs.data.modFreeplaySwitch && touchPad.buttonE.justPressed && !player.playingMusic)
+		if (ClientPrefs.data.modFreeplaySwitch && touchPad != null && touchPad.buttonE.justPressed && !player.playingMusic)
 		{
 			persistentUpdate = false;
 			openSubState(new FreeplayModSwitchSubState(freeplayFilterMod, function(newMod:String) {
@@ -419,7 +419,7 @@ class FreeplayState extends MusicBeatState
 			}));
 			removeTouchPad();
 		}
-		else if(FlxG.keys.justPressed.SPACE || touchPad.buttonX.justPressed)
+		else if(FlxG.keys.justPressed.SPACE || (touchPad != null && touchPad.buttonX.justPressed))
 		{
 			if(instPlaying != curSelected && !player.playingMusic)
 			{
@@ -543,7 +543,7 @@ class FreeplayState extends MusicBeatState
 			DiscordClient.loadModRPC();
 			#end
 		}
-		else if((controls.RESET || touchPad.buttonY.justPressed) && !player.playingMusic)
+		else if((controls.RESET || (touchPad != null && touchPad.buttonY.justPressed)) && !player.playingMusic)
 		{
 			persistentUpdate = false;
 			openSubState(new ResetScoreSubState(songs[curSelected].songName, curDifficulty, songs[curSelected].songCharacter));
