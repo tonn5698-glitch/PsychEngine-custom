@@ -11,19 +11,32 @@ echo Installing dependencies...
 echo This might take a few moments depending on your internet speed.
 
 install_haxelib() {
-	if ! haxelib list | grep -q "^$1:"; then
-		shift
-		haxelib "$@"
+	name=$1
+	shift
+	if [ "$1" = "install" ] && [ $# -ge 3 ]; then
+		case $3 in
+			""|-*)
+				if haxelib list | grep -q "^$name:"; then
+					return 0
+				fi
+				;;
+			*)
+				if haxelib list | grep -Eq "^$name: ?$3([[:space:]]|$)"; then
+					return 0
+				fi
+				;;
+		esac
+	elif haxelib list | grep -q "^$name:"; then
+		return 0
 	fi
+	haxelib "$@"
 }
 
 haxelib git hxcpp https://github.com/kittycathy233/hxcpp --quiet
 haxelib git lime https://github.com/kittycathy233/lime --quiet
 install_haxelib openfl install openfl 9.4.1 --quiet
 haxelib git flixel https://github.com/kittycathy233/flixel --quiet
-# Force reinstall flixel-addons (cache có thể giữ version cũ không tương thích)
-haxelib remove flixel-addons --quiet 2>/dev/null || true
-haxelib install flixel-addons 3.2.3 --quiet
+install_haxelib flixel-addons install flixel-addons 3.3.2 --quiet
 install_haxelib flixel-tools install flixel-tools 1.5.1 --quiet
 install_haxelib hscript-iris install hscript-iris 1.1.3 --quiet
 install_haxelib tjson install tjson 1.4.0 --quiet
