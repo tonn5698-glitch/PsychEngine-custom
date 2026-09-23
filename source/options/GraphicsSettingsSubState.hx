@@ -66,6 +66,13 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 			BOOL);
 		addOption(option);
 
+		// ===== THỬ NGHIỆM =====
+		var option:Option = new Option('Enable Haxe Logs',
+			'Thiết dùng cho modding: ghi log vào logs/Haxe/.\nDùng để xem mod bị lỗi gì mà không cần debug build.',
+			'enableHaxeLogs',
+			BOOL);
+		addOption(option);
+
 		super();
 		insert(1, boyfriend);
 	}

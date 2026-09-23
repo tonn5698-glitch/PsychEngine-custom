@@ -1825,6 +1825,9 @@ class FunkinLua {
 	}
 
 	public static function luaTrace(text:String, ignoreCheck:Bool = false, deprecated:Bool = false, color:FlxColor = FlxColor.WHITE) {
+		// Ghi vào HaxeLog (modding: xem script error)
+		backend.HaxeLog.write('[Lua] ' + text);
+
 		if(ignoreCheck || getBool('luaDebugMode')) {
 			if(deprecated && !getBool('luaDeprecatedWarnings')) {
 				return;

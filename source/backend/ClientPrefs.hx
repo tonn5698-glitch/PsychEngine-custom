@@ -18,6 +18,7 @@ import states.TitleState;
 	public var hitboxType:String = "Gradient";
 	public var popUpRating:Bool = true;
 	public var vsync:Bool = false;
+	public var enableHaxeLogs:Bool = false; // Thử nghiệm: ghi log vào logs/Haxe/
 	public var gameOverVibration:Bool = false;
 	public var fpsRework:Bool = false;
 	

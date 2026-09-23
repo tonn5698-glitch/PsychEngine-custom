@@ -133,6 +133,7 @@ class Character extends FlxSprite
 		catch(e:Dynamic)
 		{
 			trace('Error loading character file of "$character": $e');
+			backend.HaxeLog.error('Error loading character "$character": $e', 'Character');
 		}
 
 		skipDance = false;

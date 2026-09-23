@@ -364,6 +364,7 @@ class Paths
 			if (bitmap == null)
 			{
 				trace('Bitmap not found: $file | key: $key');
+				backend.HaxeLog.write('[Paths] Bitmap not found: $file (key: $key)');
 				return null;
 			}
 		}
