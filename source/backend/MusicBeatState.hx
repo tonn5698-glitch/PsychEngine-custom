@@ -167,7 +167,7 @@ class MusicBeatState extends FlxState
 		if (cursorBmp != null && cursorIndicator == null)
 		{
 			cursorIndicator = new flixel.FlxSprite(FlxG.width - 40, FlxG.height - 50);
-			cursorIndicator.pixels.copyPixels(cursorBmp, cursorBmp.rect, new openfl.geom.Point(0, 0));
+			cursorIndicator.loadGraphic(cursorBmp);
 			cursorIndicator.scrollFactor.set();
 			cursorIndicator.alpha = 0.8;
 			cursorIndicator.visible = false;
