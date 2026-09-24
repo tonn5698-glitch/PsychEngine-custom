@@ -62,15 +62,10 @@ class MobileOptionsSubState extends BaseOptionsMenu
 		option.onChange = () -> lime.system.System.allowScreenTimeout = curOption.getValue();
 		addOption(option);
 
-		option = new Option('Wide Screen Mode',
-			'If checked, The game will stetch to fill your whole screen. (WARNING: Can result in bad visuals & break some mods that resizes the game/cameras)',
+		option = new Option('Wide Screen Mode (Restart)',
+			'If checked, expands the game width to match your screen aspect ratio\n(height stays 720). Fills the screen without stretching. Requires restart.',
 			'wideScreen', BOOL);
 		option.onChange = () -> FlxG.scaleMode = new MobileScaleMode();
-		addOption(option);
-
-		option = new Option('Full Screen Mode (Restart)',
-			'If checked, the game will use the actual device resolution.\nRequires restart to take effect.',
-			'fullScreenMode', BOOL);
 		addOption(option);
 		#end
 

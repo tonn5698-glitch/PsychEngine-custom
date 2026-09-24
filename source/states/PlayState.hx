@@ -325,12 +325,9 @@ class PlayState extends MusicBeatState
 		camOther.bgColor.alpha = 0;
 		luaTpadCam.bgColor.alpha = 0;
 
-		// Wide screen: resize HUD camera to match actual screen
-		if (ClientPrefs.data.wideScreen)
-		{
-			camHUD.setSize(FlxG.stage.stageWidth, FlxG.stage.stageHeight);
-			camHUD.zoom = FlxG.stage.stageWidth / 1280; // Scale HUD proportionally
-		}
+		// Wide screen: FlxG.width đã expand từ startup (Main.hx) → camera default
+		// đã có size FlxG.width×FlxG.height. KHÔNG setSize(stageWidth/Height) —
+		// trộn unit physical/game pixel sẽ vỡ zoom/position của camHUD.
 
 		FlxG.cameras.add(camHUD, false);
 		FlxG.cameras.add(camOther, false);

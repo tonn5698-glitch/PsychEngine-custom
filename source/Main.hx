@@ -155,15 +155,35 @@ class Main extends Sprite
 		});
 		#end
 
-		// Full Screen Mode: dùng resolution thật của device thay vì 1280x720
+		// Resolution strategy (mobile):
+		// 1) fullScreenMode (Experiment): native device resolution cả W+H — rủi ro cao.
+		// 2) wideScreen: expand width theo aspect, height giữ 720 — ít rủi ro.
+		// loadPrefs() chưa chạy lúc này — đọc trực tiếp từ save (sau bind ở trên).
 		var gameW:Int = game.width;
 		var gameH:Int = game.height;
 		#if mobile
-		if (ClientPrefs.data.fullScreenMode)
+		var nativeFull:Bool = ClientPrefs.data.fullScreenMode;
+		if (FlxG.save.data != null && FlxG.save.data.fullScreenMode != null)
+			nativeFull = FlxG.save.data.fullScreenMode;
+
+		var expandWidth:Bool = ClientPrefs.data.wideScreen;
+		if (FlxG.save.data != null && FlxG.save.data.wideScreen != null)
+			expandWidth = FlxG.save.data.wideScreen;
+
+		var stageW:Int = Lib.current.stage.stageWidth;
+		var stageH:Int = Lib.current.stage.stageHeight;
+
+		if (nativeFull && stageW > 0 && stageH > 0)
 		{
-			gameW = Lib.current.stage.stageWidth;
-			gameH = Lib.current.stage.stageHeight;
-			trace('[FullScreen] Using device resolution: ${gameW}x${gameH}');
+			gameW = stageW;
+			gameH = stageH;
+			trace('[FullScreen] Native resolution: ${gameW}x${gameH}');
+		}
+		else if (expandWidth && stageW > 0 && stageH > 0)
+		{
+			// Wide Screen: expand width theo aspect, height giữ 720 → y-coordinate an toàn
+			gameW = Math.ceil(gameH * (stageW / stageH));
+			trace('[WideScreen] Expanded logical size: ${gameW}x${gameH} (device ${stageW}x${stageH})');
 		}
 		#end
 

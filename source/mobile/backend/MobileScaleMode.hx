@@ -34,15 +34,23 @@ class MobileScaleMode extends BaseScaleMode
 
 	override function updateGameSize(Width:Int, Height:Int):Void
 	{
-		if (ClientPrefs.data.wideScreen && allowWideScreen)
+		// Wide Screen Mode: FlxG.width đã expand từ startup theo aspect ratio
+		// (Main.hx). Khi đó ratio FlxG.width/height đã khớp màn hình → letterbox
+		// mặc định fit đúng, không cần stretch branch riêng.
+		// Chỉ stretch khi wideScreen bật NHƯNG width chưa expand (vd đổi setting
+		// giữa session chưa restart) — giữ fallback an toàn.
+		var ratio:Float = FlxG.width / FlxG.height;
+		var realRatio:Float = Width / Height;
+		var expandedToScreen:Bool = Math.abs(realRatio - ratio) < 0.01; // gần khớp → không cần letterbox
+
+		if ((ClientPrefs.data.wideScreen && allowWideScreen) || expandedToScreen)
 		{
-			super.updateGameSize(Width, Height);
+			// Fit đúng tỷ lệ (đã khớp hoặc muốn lấp): full size, không cắt
+			gameSize.x = Width;
+			gameSize.y = Height;
 		}
 		else
 		{
-			var ratio:Float = FlxG.width / FlxG.height;
-			var realRatio:Float = Width / Height;
-
 			var scaleY:Bool = realRatio < ratio;
 
 			if (scaleY)
@@ -60,7 +68,15 @@ class MobileScaleMode extends BaseScaleMode
 
 	override function updateGamePosition():Void
 	{
-		if (ClientPrefs.data.wideScreen && allowWideScreen)
+		// Khi wideScreen hoặc ratio đã khớp → neo góc trên-trái (lấp màn hình)
+		// không còn thanh đen do letterbox.
+		var ratio:Float = FlxG.width / FlxG.height;
+		var realRatio:Float = FlxG.stage != null && FlxG.stage.stageHeight > 0
+			? FlxG.stage.stageWidth / FlxG.stage.stageHeight : ratio;
+		var fillScreen:Bool = (ClientPrefs.data.wideScreen && allowWideScreen)
+			|| Math.abs(realRatio - ratio) < 0.01;
+
+		if (fillScreen)
 			FlxG.game.x = FlxG.game.y = 0;
 		else
 			super.updateGamePosition();

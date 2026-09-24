@@ -73,14 +73,20 @@ class BaseOptionsMenu extends MusicBeatSubstate
 
 		for (i in 0...optionsArray.length)
 		{
-			var optionText:Alphabet = new Alphabet(220, 260, optionsArray[i].name, false);
+			// Freeplay-style: selected centered giữa title (45) và desc (~600).
+			// startPosition.y là vị trí item selected (targetY=0); các item khác
+			// offset ±1.3*distancePerItem.y → scroll tự nhiên, không trôi OFF màn hình.
+			// Non-BOOL lệch -80px (cho value text) — tính vào startPosition TRƯỚC snap.
+			var isBool:Bool = optionsArray[i].type == BOOL;
+			var baseX:Float = isBool ? 220 : 140;
+			var optionText:Alphabet = new Alphabet(baseX, 0, optionsArray[i].name, false);
 			optionText.isMenuItem = true;
-			/*optionText.forceX = 300;
-			optionText.yMult = 90;*/
+			optionText.startPosition.set(baseX, Math.floor(FlxG.height * 0.45));
 			optionText.targetY = i;
+			optionText.snapToPosition();
 			grpOptions.add(optionText);
 
-			if(optionsArray[i].type == BOOL)
+			if(isBool)
 			{
 				var checkbox:CheckboxThingie = new CheckboxThingie(optionText.x - 105, optionText.y, Std.string(optionsArray[i].getValue()) == 'true');
 				checkbox.sprTracker = optionText;
@@ -89,9 +95,6 @@ class BaseOptionsMenu extends MusicBeatSubstate
 			}
 			else
 			{
-				optionText.x -= 80;
-				optionText.startPosition.x -= 80;
-				//optionText.xAdd -= 80;
 				var valueText:AttachedText = new AttachedText('' + optionsArray[i].getValue(), optionText.width + 60);
 				valueText.sprTracker = optionText;
 				valueText.copyAlpha = true;
@@ -99,7 +102,6 @@ class BaseOptionsMenu extends MusicBeatSubstate
 				grpTexts.add(valueText);
 				optionsArray[i].child = valueText;
 			}
-			//optionText.snapToPosition(); //Don't ignore me when i ask for not making a fucking pull request to uncomment this line ok
 			updateTextFrom(optionsArray[i]);
 		}
 
@@ -491,7 +493,11 @@ class BaseOptionsMenu extends MusicBeatSubstate
 		{
 			item.targetY = num - curSelected;
 			item.alpha = 0.6;
-			if (item.targetY == 0) item.alpha = 1;
+			if (item.targetY == 0)
+			{
+				item.alpha = 1;
+				item.snapToPosition();
+			}
 		}
 		for (text in grpTexts)
 		{

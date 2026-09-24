@@ -15,6 +15,7 @@ class OptionsState extends MusicBeatState
 		'Optimization'
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 		,'Mobile Options'
+		,'Experiment'
 	];
 	private var grpOptions:FlxTypedGroup<Alphabet>;
 	private static var curSelected:Int = 0;
@@ -44,6 +45,8 @@ class OptionsState extends MusicBeatState
 				MusicBeatState.switchState(new options.NoteOffsetState());
 			case 'Mobile Options':
 				openSubState(new mobile.options.MobileOptionsSubState());
+			case 'Experiment':
+				openSubState(new options.ExperimentSubState());
 			case 'Language':
 				openSubState(new options.LanguageSubState());
 		}
@@ -79,11 +82,18 @@ class OptionsState extends MusicBeatState
 		grpOptions = new FlxTypedGroup<Alphabet>();
 		add(grpOptions);
 
+		// Freeplay-style scrolling list: selected item centered, list scrolls.
+		// Fixed layout với 9 category từng trôi OFF TOP/BOTTOM.
+		final startY:Float = FlxG.height / 2 - 40;
 		for (num => option in options)
 		{
 			var optionText:Alphabet = new Alphabet(0, 0, Language.getPhrase('options_$option', option), true);
-			optionText.screenCenter();
-			optionText.y += (92 * (num - (options.length / 2))) + 45;
+			optionText.isMenuItem = true;
+			// startPosition.x = vị trí center của item NÀY khi nó được select (targetY=0).
+			// Khi scroll, item nào lên selected cũng tự center theo width của nó.
+			optionText.startPosition.set((FlxG.width - optionText.width) / 2, startY);
+			optionText.targetY = num - curSelected;
+			optionText.snapToPosition();
 			grpOptions.add(optionText);
 		}
 
@@ -156,6 +166,8 @@ class OptionsState extends MusicBeatState
 			if (item.targetY == 0)
 			{
 				item.alpha = 1;
+				// Snap ngay để selector không lag 1 frame sau khi scroll
+				item.snapToPosition();
 				selectorLeft.x = item.x - 63;
 				selectorLeft.y = item.y;
 				selectorRight.x = item.x + item.width + 15;
