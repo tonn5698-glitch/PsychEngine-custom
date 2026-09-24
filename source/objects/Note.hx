@@ -178,10 +178,11 @@ class Note extends FlxSprite
 
 	public function defaultRGB()
 	{
-		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[noteData];
-		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[noteData];
+		// Safe for mania/extra keys — wrap palette index (arrowRGB only has 4 base colors).
+		var palette:Array<Array<FlxColor>> = PlayState.isPixelStage ? ClientPrefs.data.arrowRGBPixel : ClientPrefs.data.arrowRGB;
+		var arr:Array<FlxColor> = (palette != null && palette.length > 0) ? palette[Std.int(Math.abs(noteData)) % palette.length] : null;
 
-		if (arr != null && noteData > -1 && noteData <= arr.length)
+		if (arr != null && arr.length >= 3)
 		{
 			rgbShader.r = arr[0];
 			rgbShader.g = arr[1];
