@@ -14,6 +14,11 @@ class ExperimentSubState extends BaseOptionsMenu
 			'fullScreenMode', BOOL);
 		addOption(option);
 
+		option = new Option('Enable Funky Mode',
+			'If checked, menu HUD elements bounce (scale) on every beat.\nBeat is tracked automatically from the menu music.\nDoes not apply during gameplay (PlayState).',
+			'funkyMode', BOOL);
+		addOption(option);
+
 		super();
 	}
 }

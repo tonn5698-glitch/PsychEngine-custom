@@ -20,6 +20,7 @@ import states.TitleState;
 	public var vsync:Bool = false;
 	public var enableHaxeLogs:Bool = false; // Thử nghiệm: ghi log vào logs/Haxe/
 	public var fullScreenMode:Bool = false; // Full screen thật (cần restart)
+	public var funkyMode:Bool = false; // Experiment: HUD bop theo beat (ngoài PlayState)
 	public var gameOverVibration:Bool = false;
 	public var fpsRework:Bool = false;
 	
