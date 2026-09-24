@@ -120,6 +120,7 @@ class MusicBeatState extends FlxState
 	{
 		removeTouchPad();
 		removeMobileControls();
+		FunkyMode.clearCache();
 
 		#if LUA_ALLOWED
 		for (lua in luaArray)
@@ -231,6 +232,9 @@ class MusicBeatState extends FlxState
 		//everyStep();
 		var oldStep:Int = curStep;
 		timePassedOnState += elapsed;
+
+		// Funky Mode: auto track beat từ menu music (bỏ qua PlayState)
+		FunkyMode.autoTrackMusic();
 
 		updateCurStep();
 		updateBeat();
@@ -363,6 +367,10 @@ class MusicBeatState extends FlxState
 			stage.curDecBeat = curDecBeat;
 			stage.beatHit();
 		});
+
+		// Funky Mode: bop HUD/menu members theo beat (chỉ ngoài PlayState)
+		if (FunkyMode.shouldBop())
+			FunkyMode.bopMembers(members);
 	}
 
 	public function sectionHit():Void
