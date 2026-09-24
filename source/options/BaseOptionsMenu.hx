@@ -155,6 +155,13 @@ class BaseOptionsMenu extends MusicBeatSubstate
 
 		if(nextAccept <= 0)
 		{
+			// Custom accept hook (VD: Bop Style mở tab test) — STRING/INT/FLOAT default không xử lý ACCEPT
+			if(curOption.onAccept != null && controls.ACCEPT)
+			{
+				FlxG.sound.play(Paths.sound('scrollMenu'));
+				curOption.onAccept();
+				return;
+			}
 			switch(curOption.type)
 			{
 				case BOOL:
@@ -519,4 +526,16 @@ class BaseOptionsMenu extends MusicBeatSubstate
 	function reloadCheckboxes()
 		for (checkbox in checkboxGroup)
 			checkbox.daValue = Std.string(optionsArray[checkbox.ID].getValue()) == 'true'; //Do not take off the Std.string() from this, it will break a thing in Mod Settings Menu
+
+	/** Refresh value text/checkbox hiện tại (gọi khi substate bên trong đổi value, VD BopStyle). */
+	public function refreshOptionValues():Void
+	{
+		if(curOption != null)
+		{
+			if(curOption.type == STRING && curOption.options != null)
+				curOption.curOption = curOption.options.indexOf(curOption.getValue());
+			updateTextFrom(curOption);
+		}
+		reloadCheckboxes();
+	}
 }

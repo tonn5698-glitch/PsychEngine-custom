@@ -11,6 +11,21 @@ import flixel.group.FlxGroup.FlxTypedGroup;
  */
 class FunkyMode
 {
+	// Danh sách Bop Style có thể chọn (Experiment) hoặc đặt trong Engine.json "bop-style"
+	public static final BOP_STYLES:Array<String> = [
+		'Linear',
+		'Sine In', 'Sine Out', 'Sine InOut',
+		'Quad In', 'Quad Out', 'Quad InOut',
+		'Cube In', 'Cube Out', 'Cube InOut',
+		'Quart In', 'Quart Out', 'Quart InOut',
+		'Quint In', 'Quint Out', 'Quint InOut',
+		'Expo In', 'Expo Out', 'Expo InOut',
+		'Circ In', 'Circ Out', 'Circ InOut',
+		'Back In', 'Back Out', 'Back InOut',
+		'Bounce In', 'Bounce Out', 'Bounce InOut',
+		'Elastic In', 'Elastic Out', 'Elastic InOut'
+	];
+
 	// Base scale cache — key là FlxPoint.scale reference của object
 	static var scaleCache:haxe.ds.ObjectMap<FlxPoint, FlxPoint> = new haxe.ds.ObjectMap();
 
@@ -18,6 +33,7 @@ class FunkyMode
 	 * Auto track Conductor.songPosition từ menu music.
 	 * Gọi mỗi frame ở MusicBeatState/MusicBeatSubstate KHI funkyMode ON
 	 * và KHÔNG phải PlayState (PlayState tự track).
+	 * Đồng thời set Conductor.bpm = bopBpm (Engine.json "bop-bpm") để nhịp bop đúng config.
 	 */
 	public static function autoTrackMusic():Void
 	{
@@ -26,6 +42,8 @@ class FunkyMode
 		// PlayState tự quản lý Conductor — không đụng
 		if (Std.isOfType(FlxG.state, PlayState)) return;
 		Conductor.songPosition = FlxG.sound.music.time;
+		if (ClientPrefs.data.bopBpm > 0)
+			Conductor.bpm = ClientPrefs.data.bopBpm;
 	}
 
 	/** Có nên bop ở beat này không? */
@@ -102,7 +120,41 @@ class FunkyMode
 
 		FlxTween.cancelTweensOf(scale);
 		scale.set(base.x * bump, base.y * bump);
-		FlxTween.tween(scale, {x: base.x, y: base.y}, dur, {ease: FlxEase.cubeOut});
+		FlxTween.tween(scale, {x: base.x, y: base.y}, dur, {ease: getEase(ClientPrefs.data.bopStyle)});
+	}
+
+	/** Map tên style (VD: "Cube Out", "cubeout", "backout") → function FlxEase. */
+	public static function getEase(style:String):Float->Float
+	{
+		var key:String = labelToField(style);
+		var fn:Dynamic = Reflect.field(FlxEase, key);
+		if (fn != null)
+			return cast fn;
+		return FlxEase.linear;
+	}
+
+	/** Chuẩn hóa bất kỳ format ("cubeout"/"Cube Out"/"cube_out") → nhãn chuẩn trong BOP_STYLES. */
+	public static function normalizeStyle(raw:String):String
+	{
+		if (raw == null) return 'Cube Out';
+		var s:String = raw.toLowerCase().split(' ').join('').split('_').join('').split('-').join('');
+		for (style in BOP_STYLES)
+		{
+			var cmp:String = style.toLowerCase().split(' ').join('');
+			if (cmp == s) return style;
+		}
+		return 'Cube Out';
+	}
+
+	/** "Cube Out" → "cubeOut", "Sine InOut" → "sineInOut", "Linear" → "linear". */
+	static function labelToField(label:String):String
+	{
+		if (label == null) return 'linear';
+		var parts:Array<String> = label.split(' ');
+		var field:String = parts[0].toLowerCase();
+		for (i in 1...parts.length)
+			field += parts[i].charAt(0).toUpperCase() + parts[i].substring(1);
+		return field;
 	}
 
 	/** Clear cache base scale (gọi khi switch state để tránh leak reference). */

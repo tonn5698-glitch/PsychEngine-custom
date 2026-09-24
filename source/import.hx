@@ -57,6 +57,8 @@ import backend.BaseStage;
 import backend.Difficulty;
 import backend.Mods;
 import backend.Language;
+import backend.FunkyMode;
+import backend.EngineJSON;
 import mobile.backend.StorageUtil;
 
 import backend.ui.*; //Psych-UI

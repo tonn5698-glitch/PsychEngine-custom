@@ -22,6 +22,9 @@ import states.TitleState;
 	public var fullScreenMode:Bool = false; // Full screen thật (cần restart)
 	public var funkyMode:Bool = false; // Experiment: HUD bop theo beat (ngoài PlayState)
 	public var introToMenu:Bool = false; // Experiment: intro.mp4 → MainMenu (bỏ Title), mute intro, play freakyMenu
+	public var customIntroVideo:Bool = false; // Experiment: intro từ mod Engine.json
+	public var bopStyle:String = 'Cube Out'; // Experiment/Engine.json: ease bop (linear, cubeout,...)
+	public var bopBpm:Int = 102; // Engine.json "bop-bpm" — BPM nhịp bop
 	public var gameOverVibration:Bool = false;
 	public var fpsRework:Bool = false;
 	
@@ -329,6 +332,12 @@ class ClientPrefs {
 			}
 			reloadVolumeKeys();
 		}
+
+		// Mod Engine.json: áp dụng bop-bpm/bop-style default (nếu user chưa set riêng)
+		#if MODS_ALLOWED
+		EngineJSON.load();
+		EngineJSON.applyBopDefaults();
+		#end
 	}
 
 	inline public static function getGameplaySetting(name:String, defaultValue:Dynamic = null, ?customDefaultValue:Bool = false):Dynamic

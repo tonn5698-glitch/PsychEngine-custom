@@ -58,10 +58,28 @@ class IntroState extends MusicBeatState
 		if (FlxG.save.data != null && Reflect.hasField(FlxG.save.data, 'introToMenu'))
 			skipTitle = Reflect.field(FlxG.save.data, 'introToMenu') == true;
 
+		// Experiment (customIntroVideo): intro từ mod Engine.json
+		var customIntro:Bool = false;
+		if (FlxG.save.data != null && Reflect.hasField(FlxG.save.data, 'customIntroVideo'))
+			customIntro = Reflect.field(FlxG.save.data, 'customIntroVideo') == true;
+
+		// Đọc Engine.json từ mods (video + bop config)
+		#if MODS_ALLOWED
+		EngineJSON.load();
+		#end
+
 		#if VIDEOS_ALLOWED
 		#if sys dbg('[IntroState] VIDEOS_ALLOWED = YES'); #end
 
 		var videoFile:String = getVideoFile();
+
+		#if MODS_ALLOWED
+		if (customIntro && EngineJSON.videoPath != null && FileSystem.exists(EngineJSON.videoPath))
+		{
+			videoFile = EngineJSON.videoPath;
+			#if sys dbg('[IntroState] Custom intro video: ' + videoFile); #end
+		}
+		#end
 
 		#if sys dbg('[IntroState] videoFile = ' + videoFile); #end
 

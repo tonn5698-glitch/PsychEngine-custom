@@ -21,6 +21,7 @@ class Option
 	public var child:Alphabet;
 	public var text(get, set):String;
 	public var onChange:Void->Void = null; //Pressed enter (on Bool type options) or pressed/held left/right (on other types)
+	public var onAccept:Void->Void = null; //Pressed enter on non-BOOL/non-KEYBIND options (mở substate,...)
 	public var type:OptionType = BOOL;
 
 	public var scrollSpeed:Float = 50; //Only works on int/float, defines how fast it scrolls per second while holding left/right
