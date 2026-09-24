@@ -21,6 +21,7 @@ import states.TitleState;
 	public var enableHaxeLogs:Bool = false; // Thử nghiệm: ghi log vào logs/Haxe/
 	public var fullScreenMode:Bool = false; // Full screen thật (cần restart)
 	public var funkyMode:Bool = false; // Experiment: HUD bop theo beat (ngoài PlayState)
+	public var introToMenu:Bool = false; // Experiment: intro.mp4 → MainMenu (bỏ Title), mute intro, play freakyMenu
 	public var gameOverVibration:Bool = false;
 	public var fpsRework:Bool = false;
 	

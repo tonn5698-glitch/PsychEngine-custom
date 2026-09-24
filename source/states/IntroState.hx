@@ -53,6 +53,11 @@ class IntroState extends MusicBeatState
 		dbg('[IntroState] cwd="' + Sys.getCwd() + '"');
 		#end
 
+		// Experiment (introToMenu): đọc trực tiếp từ save — loadPrefs() mới chạy ở TitleState
+		var skipTitle:Bool = false;
+		if (FlxG.save.data != null && Reflect.hasField(FlxG.save.data, 'introToMenu'))
+			skipTitle = Reflect.field(FlxG.save.data, 'introToMenu') == true;
+
 		#if VIDEOS_ALLOWED
 		#if sys dbg('[IntroState] VIDEOS_ALLOWED = YES'); #end
 
@@ -63,19 +68,32 @@ class IntroState extends MusicBeatState
 		if (videoFile == null)
 		{
 			#if sys dbg('[IntroState] Video not found, skipping intro...'); #end
-			goToTitle();
+			if (skipTitle) goToMenu(); else goToTitle();
 			return;
 		}
 
 		#if sys dbg('[IntroState] Playing intro video: ' + videoFile); #end
 		videoSprite = new VideoSprite(videoFile, false, true); // skippable
-		videoSprite.finishCallback = goToTitle;
-		videoSprite.onSkip = goToTitle;
+		if (skipTitle)
+		{
+			// Nối tiếp intro: mute video + phát freakyMenu ngay dưới intro
+			videoSprite.videoSprite.volumeAdjust = 0; // hxvlc 2.x: mute video audio
+			FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
+			if (FlxG.sound.music != null)
+				FlxG.sound.music.fadeIn(1, 0, 0.8);
+			videoSprite.finishCallback = goToMenu;
+			videoSprite.onSkip = goToMenu;
+		}
+		else
+		{
+			videoSprite.finishCallback = goToTitle;
+			videoSprite.onSkip = goToTitle;
+		}
 		add(videoSprite);
 		videoSprite.play();
 		#else
 		#if sys dbg('[IntroState] VIDEOS_ALLOWED = NO'); #end
-		goToTitle();
+		if (skipTitle) goToMenu(); else goToTitle();
 		#end
 	}
 
@@ -184,5 +202,47 @@ class IntroState extends MusicBeatState
 		FlxTransitionableState.skipNextTransIn = true;
 		FlxTransitionableState.skipNextTransOut = true;
 		MusicBeatState.switchState(new TitleState());
+	}
+
+	/**
+	 * Nối tiếp intro (introToMenu): fade thẳng vào MainMenu, bỏ Title.
+	 * Chạy các side-effect mà TitleState.create() sẽ làm (loadPrefs/MobileData/init).
+	 * KHÔNG set skipNextTrans → switchState dùng CustomFadeTransition (fade out/in).
+	 */
+	function goToMenu():Void
+	{
+		if (goingToTitle)
+			return;
+		goingToTitle = true;
+
+		trace('[IntroState] goToMenu() — skip Title → MainMenu');
+		#if android PsychJNI.logDebug('[IntroState] goToMenu()'); #end
+
+		// TitleState.create() side-effects (vì skip Title)
+		if (!TitleState.initialized)
+		{
+			ClientPrefs.loadPrefs();
+			Language.reloadPhrases();
+			MobileData.init();
+			TitleState.initialized = true; // Title (nếu BACK về) sẽ skipIntro, không load lại
+			if (FlxG.save.data != null && FlxG.save.data.fullscreen)
+				FlxG.fullscreen = FlxG.save.data.fullscreen;
+			if (FlxG.save.data != null && FlxG.save.data.weekCompleted != null)
+				StoryMenuState.weekCompleted = FlxG.save.data.weekCompleted;
+		}
+
+		// freakyMenu BPM = 102 (TitleState musicBPM default) — cần cho funkyMode beat track
+		Conductor.bpm = 102;
+
+		// Đảm bảo menu music đang phát (video null / skip trước khi music start)
+		if (FlxG.sound.music == null || !FlxG.sound.music.playing)
+		{
+			FlxG.sound.playMusic(Paths.music('freakyMenu'), 0);
+			if (FlxG.sound.music != null)
+				FlxG.sound.music.fadeIn(1, 0, 0.8);
+		}
+
+		// Fade transition → MainMenu (không skip trans — fade out/in như yêu cầu)
+		MusicBeatState.switchState(new MainMenuState());
 	}
 }

@@ -19,6 +19,11 @@ class ExperimentSubState extends BaseOptionsMenu
 			'funkyMode', BOOL);
 		addOption(option);
 
+		option = new Option('Skip Title After Intro',
+			'If checked, after intro.mp4 ends (or is skipped) the game fades directly into the Main Menu.\nThe intro video is muted and freakyMenu starts immediately.\nSkips the Title Screen.',
+			'introToMenu', BOOL);
+		addOption(option);
+
 		super();
 	}
 }
