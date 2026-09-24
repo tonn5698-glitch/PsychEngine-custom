@@ -1,7 +1,8 @@
 package backend;
 
+import flixel.FlxBasic;
 import flixel.group.FlxSpriteGroup;
-import flixel.group.FlxTypedGroup;
+import flixel.group.FlxGroup.FlxTypedGroup;
 
 /**
  * Funky Mode (Experiment): HUD/menu elements "bop" scale theo beat.
