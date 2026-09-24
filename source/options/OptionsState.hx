@@ -64,8 +64,9 @@ class OptionsState extends MusicBeatState
 		var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		bg.color = 0xFFea71fd;
+		// Wide Screen: lấp full width trước khi center
+		bg.setGraphicSize(Std.int(Math.max(bg.width, FlxG.width)), 0);
 		bg.updateHitbox();
-
 		bg.screenCenter();
 		add(bg);
 

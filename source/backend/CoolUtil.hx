@@ -8,6 +8,17 @@ import lime.utils.Assets as LimeAssets;
 #end
 class CoolUtil
 {
+	/**
+	 * Wide Screen Mode: phần cutout mỗi bên khi FlxG.width expand > 1280 (height vẫn 720).
+	 * Element hardcode theo design 1280 cần +designCutout() để center giữa màn,
+	 * expansion xuất hiện đều 2 bên thay vì chỉ dồn 1 bên.
+	 * Trả về 0 khi không expand (width<=1280) hoặc native fullScreenMode (height!=720).
+	 */
+	public static inline function designCutout():Float
+	{
+		return (FlxG.width > 1280 && FlxG.height == 720) ? (FlxG.width - 1280) * 0.5 : 0;
+	}
+
 	public static function checkForUpdates(url:String = null):String {
 		if (url == null || url.length == 0)
 			url = "https://raw.githubusercontent.com/MobilePorting/FNF-PsychEngine-Mobile/main/gitVersion.txt";

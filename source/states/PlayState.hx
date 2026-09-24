@@ -375,6 +375,13 @@ class PlayState extends MusicBeatState
 		DAD_X = stageData.opponent[0];
 		DAD_Y = stageData.opponent[1];
 
+		// Wide Screen: offset character spawn theo design cutout → center trong vùng 1280
+		// (stage screenCenter theo FlxG.width đã center W; char cần +cutout để khớp).
+		var designCut:Float = CoolUtil.designCutout();
+		BF_X += designCut;
+		GF_X += designCut;
+		DAD_X += designCut;
+
 		if(stageData.camera_speed != null)
 			cameraSpeed = stageData.camera_speed;
 
@@ -1470,26 +1477,30 @@ class PlayState extends MusicBeatState
 							oldNote.resizeByRatio(curStepCrochet / Conductor.stepCrochet);
 						}
 
-						if (sustainNote.mustPress) sustainNote.x += FlxG.width / 2; // general offset
+						// mustPress: designHalf (640 khi height=720) + cutout đã có ở Note ctor
+						// → tổng = cutout + STRUM_X + 50 + swag + 640, khớp strum player.
+						// height≠720 (native full): designHalf = W/2, cutout=0 → tổng = W/2 như cũ.
+						var designHalf:Float = (FlxG.height == 720) ? 640 : (FlxG.width / 2);
+						if (sustainNote.mustPress) sustainNote.x += designHalf;
 						else if(ClientPrefs.data.middleScroll)
 						{
 							sustainNote.x += 310;
 							if(noteColumn > 1) //Up and Right
-								sustainNote.x += FlxG.width / 2 + 25;
+								sustainNote.x += designHalf + 25;
 						}
 					}
 				}
 
 				if (swagNote.mustPress)
 				{
-					swagNote.x += FlxG.width / 2; // general offset
+					swagNote.x += ((FlxG.height == 720) ? 640 : (FlxG.width / 2));
 				}
 				else if(ClientPrefs.data.middleScroll)
 				{
 					swagNote.x += 310;
 					if(noteColumn > 1) //Up and Right
 					{
-						swagNote.x += FlxG.width / 2 + 25;
+						swagNote.x += ((FlxG.height == 720) ? 640 : (FlxG.width / 2)) + 25;
 					}
 				}
 				if(!noteTypes.contains(swagNote.noteType))
@@ -1575,7 +1586,10 @@ class PlayState extends MusicBeatState
 	public var skipArrowStartTween:Bool = false; //for lua
 	private function generateStaticArrows(player:Int):Void
 	{
-		var strumLineX:Float = ClientPrefs.data.middleScroll ? STRUM_X_MIDDLESCROLL : STRUM_X;
+		// Wide Screen: +designCutout để opponent/player cùng center trong vùng 1280
+		// (playerPosition dùng half=640 design, không phải FlxG.width/2).
+		var cutout:Float = CoolUtil.designCutout();
+		var strumLineX:Float = (ClientPrefs.data.middleScroll ? STRUM_X_MIDDLESCROLL : STRUM_X) + cutout;
 		var strumLineY:Float = ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50;
 		for (i in 0...4)
 		{
@@ -1604,8 +1618,8 @@ class PlayState extends MusicBeatState
 				if(ClientPrefs.data.middleScroll)
 				{
 					babyArrow.x += 310;
-					if(i > 1) { //Up and Right
-						babyArrow.x += FlxG.width / 2 + 25;
+					if(i > 1) { //Up and Right — design half 640, không dùng FlxG.width/2
+						babyArrow.x += 640 + 25;
 					}
 				}
 				opponentStrums.add(babyArrow);

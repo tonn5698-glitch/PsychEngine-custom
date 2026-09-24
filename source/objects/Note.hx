@@ -251,6 +251,8 @@ class Note extends FlxSprite
 		this.moves = false;
 
 		x += (ClientPrefs.data.middleScroll ? PlayState.STRUM_X_MIDDLESCROLL : PlayState.STRUM_X) + 50;
+		// Wide Screen: +cutout để note spawn khớp strum (strumLineX đã +designCutout)
+		x += CoolUtil.designCutout();
 		// MAKE SURE ITS DEFINITELY OFF SCREEN?
 		y -= 2000;
 		this.strumTime = strumTime;

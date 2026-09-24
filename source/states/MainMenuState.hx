@@ -90,7 +90,8 @@ class MainMenuState extends MusicBeatState
 		var bg:FlxSprite = new FlxSprite(-80).loadGraphic(Paths.image('menuBG'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		bg.scrollFactor.set(0, yScroll);
-		bg.setGraphicSize(Std.int(bg.width * 1.175));
+		// Wide Screen: ensure bg lấp full FlxG.width (1.175 * natural có thể < W)
+		bg.setGraphicSize(Std.int(Math.max(bg.width * 1.175, FlxG.width)), 0);
 		bg.updateHitbox();
 		bg.screenCenter();
 		add(bg);
@@ -101,7 +102,7 @@ class MainMenuState extends MusicBeatState
 		magenta = new FlxSprite(-80).loadGraphic(Paths.image('menuDesat'));
 		magenta.antialiasing = ClientPrefs.data.antialiasing;
 		magenta.scrollFactor.set(0, yScroll);
-		magenta.setGraphicSize(Std.int(magenta.width * 1.175));
+		magenta.setGraphicSize(Std.int(Math.max(magenta.width * 1.175, FlxG.width)), 0);
 		magenta.updateHitbox();
 		magenta.screenCenter();
 		magenta.visible = false;
@@ -119,10 +120,11 @@ class MainMenuState extends MusicBeatState
 		}
 
 		if (leftOption != null)
-			leftItem = createMenuItem(leftOption, 60, 490);
+			leftItem = createMenuItem(leftOption, 60 + CoolUtil.designCutout(), 490);
 		if (rightOption != null)
 		{
-			rightItem = createMenuItem(rightOption, FlxG.width - 60, 490);
+			// Design right edge: FlxG.width - cutout - 60 (không phải màn hình thật -60)
+			rightItem = createMenuItem(rightOption, FlxG.width - CoolUtil.designCutout() - 60, 490);
 			rightItem.x -= rightItem.width;
 		}
 

@@ -150,6 +150,10 @@ class FreeplayState extends MusicBeatState
 
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
+		// Wide Screen: scale bg lấp full FlxG.width (screenCenter với bgW=1280
+		// trên W>1280 sẽ để thanh đen 2 bên không đều với list trái).
+		bg.setGraphicSize(Std.int(Math.max(bg.width, FlxG.width)), 0);
+		bg.updateHitbox();
 		add(bg);
 		bg.screenCenter();
 
@@ -158,7 +162,8 @@ class FreeplayState extends MusicBeatState
 
 		for (i in 0...songs.length)
 		{
-			var songText:Alphabet = new Alphabet(90, 320, songs[i].songName, true);
+			// Wide Screen: list thiết kế cho 1280 → +cutout để không dính mép trái đen
+			var songText:Alphabet = new Alphabet(90 + CoolUtil.designCutout(), 320, songs[i].songName, true);
 			songText.targetY = i;
 			grpSongs.add(songText);
 

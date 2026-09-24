@@ -145,7 +145,10 @@ class StrumNote extends FlxSprite
 	{
 		x += Note.swagWidth * noteData;
 		x += 50;
-		x += ((FlxG.width / 2) * player);
+		// WideScreen (height=720): half design = 640, strumLineX đã +designCutout.
+		// Native fullScreenMode (height≠720): half = FlxG.width/2 như cũ.
+		var designHalf:Float = (FlxG.height == 720) ? 640 : (FlxG.width / 2);
+		x += designHalf * player;
 	}
 
 	override function update(elapsed:Float) {
