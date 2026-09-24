@@ -1638,7 +1638,7 @@ class PlayState extends MusicBeatState
 		var cutout:Float = CoolUtil.designCutout();
 		var strumLineX:Float = (ClientPrefs.data.middleScroll ? STRUM_X_MIDDLESCROLL : STRUM_X) + cutout;
 		var strumLineY:Float = ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50;
-		var keyCount:Int = (totalColumns != null && totalColumns > 0) ? totalColumns : 4;
+		var keyCount:Int = (totalColumns > 0) ? totalColumns : 4;
 		for (i in 0...keyCount)
 		{
 			// FlxG.log.add(i);
