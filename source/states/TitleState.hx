@@ -129,6 +129,13 @@ class TitleState extends MusicBeatState
 		#if TITLE_SCREEN_EASTER_EGG easterEggData(); #end
 		Conductor.bpm = musicBPM;
 
+		// Wide Screen: center composition title (logo/GF/enter) trong vùng 1280
+		// → expansion đều 2 bên thay vì dồn trái. Áp SAU khi JSON/easter egg set X.
+		var titleCut:Float = CoolUtil.designCutout();
+		logoPosition.x += titleCut;
+		gfPosition.x += titleCut;
+		enterPosition.x += titleCut;
+
 		logoBl = new FlxSprite(logoPosition.x, logoPosition.y);
 		logoBl.frames = Paths.getSparrowAtlas('logoBumpin');
 		logoBl.antialiasing = ClientPrefs.data.antialiasing;
@@ -250,6 +257,10 @@ class TitleState extends MusicBeatState
 					{
 						var bg:FlxSprite = new FlxSprite().loadGraphic(Paths.image(titleJSON.backgroundSprite));
 						bg.antialiasing = ClientPrefs.data.antialiasing;
+						// Wide Screen: lấp full width
+						bg.setGraphicSize(Std.int(Math.max(bg.width, FlxG.width)), Std.int(Math.max(bg.height, FlxG.height)));
+						bg.updateHitbox();
+						bg.screenCenter();
 						add(bg);
 					}
 				}

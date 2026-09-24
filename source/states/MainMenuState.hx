@@ -389,7 +389,7 @@ class FreeplaySelectState extends MusicBeatState
 		var bg:FlxSprite = new FlxSprite(-80).loadGraphic(Paths.image('menuDesat'));
 		bg.antialiasing = ClientPrefs.data.antialiasing;
 		bg.scrollFactor.set(0, 0.25);
-		bg.setGraphicSize(Std.int(bg.width * 1.175));
+		bg.setGraphicSize(Std.int(Math.max(bg.width * 1.175, FlxG.width)), 0);
 		bg.updateHitbox();
 		bg.screenCenter();
 		bg.alpha = 0.5;

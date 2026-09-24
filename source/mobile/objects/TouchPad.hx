@@ -89,9 +89,11 @@ class TouchPad extends MobileInputManager implements IMobileControls
 
 			for (buttonData in MobileData.dpadModes.get(DPad).buttons)
 			{
+				// Wide Screen: neo nút theo góc màn hình thật
+				// (JSON là design 1280 — nửa phải map sang mép phải W)
 				Reflect.setField(this, buttonData.button,
-					createButton(buttonData.x, buttonData.y, buttonData.graphic, CoolUtil.colorFromString(buttonData.color),
-						Reflect.getProperty(this, buttonData.button).IDs));
+					createButton(CoolUtil.mapDesignX(buttonData.x), buttonData.y, buttonData.graphic,
+						CoolUtil.colorFromString(buttonData.color), Reflect.getProperty(this, buttonData.button).IDs));
 				add(Reflect.field(this, buttonData.button));
 			}
 		}
@@ -104,8 +106,8 @@ class TouchPad extends MobileInputManager implements IMobileControls
 			for (buttonData in MobileData.actionModes.get(Action).buttons)
 			{
 				Reflect.setField(this, buttonData.button,
-					createButton(buttonData.x, buttonData.y, buttonData.graphic, CoolUtil.colorFromString(buttonData.color),
-						Reflect.getProperty(this, buttonData.button).IDs));
+					createButton(CoolUtil.mapDesignX(buttonData.x), buttonData.y, buttonData.graphic,
+						CoolUtil.colorFromString(buttonData.color), Reflect.getProperty(this, buttonData.button).IDs));
 				add(Reflect.field(this, buttonData.button));
 			}
 		}

@@ -19,6 +19,28 @@ class CoolUtil
 		return (FlxG.width > 1280 && FlxG.height == 720) ? (FlxG.width - 1280) * 0.5 : 0;
 	}
 
+	/**
+	 * Phần width thừa so với design 1280 (= 2 * designCutout).
+	 * Dùng để anchor nút/phần tử phải về mép phải màn hình thật.
+	 */
+	public static inline function designWidthExtra():Float
+	{
+		return (FlxG.width > 1280 && FlxG.height == 720) ? (FlxG.width - 1280) : 0;
+	}
+
+	/**
+	 * Map tọa độ X từ design space (1280) sang màn hình thật:
+	 * - Nửa trái (x < 640): giữ nguyên → neo mép trái
+	 * - Nửa phải (x >= 640): +designWidthExtra → neo mép phải
+	 * Khi không expand: trả về designX giữ nguyên.
+	 */
+	public static inline function mapDesignX(designX:Float):Float
+	{
+		if (designX >= 640)
+			return designX + designWidthExtra();
+		return designX;
+	}
+
 	public static function checkForUpdates(url:String = null):String {
 		if (url == null || url.length == 0)
 			url = "https://raw.githubusercontent.com/MobilePorting/FNF-PsychEngine-Mobile/main/gitVersion.txt";
