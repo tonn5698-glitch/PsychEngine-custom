@@ -32,10 +32,11 @@ class StrumNote extends FlxSprite
 		rgbShader.enabled = false;
 		if(PlayState.SONG != null && PlayState.SONG.disableNoteRGB) useRGBShader = false;
 		
-		var arr:Array<FlxColor> = ClientPrefs.data.arrowRGB[leData];
-		if(PlayState.isPixelStage) arr = ClientPrefs.data.arrowRGBPixel[leData];
+		// Safe for mania/extra keys — wrap palette index.
+		var basePalette:Array<Array<FlxColor>> = PlayState.isPixelStage ? ClientPrefs.data.arrowRGBPixel : ClientPrefs.data.arrowRGB;
+		var arr:Array<FlxColor> = (basePalette != null && basePalette.length > 0) ? basePalette[Std.int(Math.abs(leData)) % basePalette.length] : null;
 		
-		if(leData <= arr.length)
+		if(arr != null && arr.length >= 3)
 		{
 			@:bypassAccessor
 			{
@@ -105,6 +106,7 @@ class StrumNote extends FlxSprite
 		else
 		{
 			frames = Paths.getSparrowAtlas(texture);
+			// Base 4 arrow colors (always present on NOTE_assets).
 			animation.addByPrefix('green', 'arrowUP');
 			animation.addByPrefix('blue', 'arrowDOWN');
 			animation.addByPrefix('purple', 'arrowLEFT');
@@ -113,7 +115,43 @@ class StrumNote extends FlxSprite
 			antialiasing = ClientPrefs.data.antialiasing;
 			setGraphicSize(Std.int(width * 0.7));
 
-			switch (Math.abs(noteData) % 4)
+			// Mania / EK skins: use color-based static/press/confirm when colArray has more than 4 entries
+			// or when noteData maps to a color that exists on EKNOTE-style sheets.
+			var colIdx:Int = Std.int(Math.abs(noteData)) % Note.colArray.length;
+			var col:String = Note.colArray[colIdx];
+			var useColorAnims:Bool = (noteData >= 4) || (col != null && col != 'purple' && col != 'blue' && col != 'green' && col != 'red');
+
+			if(useColorAnims && col != null)
+			{
+				// EKNOTE_assets style: "<color>0", "<color> press", "<color> confirm"
+				animation.addByPrefix('static', col + '0');
+				animation.addByPrefix('pressed', col + ' press', 24, false);
+				animation.addByPrefix('confirm', col + ' confirm', 24, false);
+				// Fallbacks if prefixes missing
+				if(animation.getByName('static') == null)
+				{
+					switch (Math.abs(noteData) % 4)
+					{
+						case 0:
+							animation.addByPrefix('static', 'arrowLEFT');
+							animation.addByPrefix('pressed', 'left press', 24, false);
+							animation.addByPrefix('confirm', 'left confirm', 24, false);
+						case 1:
+							animation.addByPrefix('static', 'arrowDOWN');
+							animation.addByPrefix('pressed', 'down press', 24, false);
+							animation.addByPrefix('confirm', 'down confirm', 24, false);
+						case 2:
+							animation.addByPrefix('static', 'arrowUP');
+							animation.addByPrefix('pressed', 'up press', 24, false);
+							animation.addByPrefix('confirm', 'up confirm', 24, false);
+						case 3:
+							animation.addByPrefix('static', 'arrowRIGHT');
+							animation.addByPrefix('pressed', 'right press', 24, false);
+							animation.addByPrefix('confirm', 'right confirm', 24, false);
+					}
+				}
+			}
+			else switch (Math.abs(noteData) % 4)
 			{
 				case 0:
 					animation.addByPrefix('static', 'arrowLEFT');

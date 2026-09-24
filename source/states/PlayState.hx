@@ -254,7 +254,7 @@ class PlayState extends MusicBeatState
 	#end
 	public var introSoundsSuffix:String = '';
 
-	// Less laggy controls
+	// Less laggy controls — default 4K binds; expanded in generateSong()/startCountdown() for mania > 4.
 	private var keysArray:Array<String>;
 	public var songName:String;
 
@@ -304,6 +304,8 @@ class PlayState extends MusicBeatState
 			'note_up',
 			'note_right'
 		];
+		// Pre-allocate strumsBlocked so out-of-range checks never hit nulls.
+		strumsBlocked = [false, false, false, false];
 
 		if(FlxG.sound.music != null)
 			FlxG.sound.music.stop();
@@ -1021,6 +1023,17 @@ class PlayState extends MusicBeatState
 			if (skipCountdown || startOnTime > 0) skipArrowStartTween = true;
 
 			canPause = true;
+			// Resolve mania key count before spawning strums (generateSong may not have run yet in edge cases).
+			totalColumns = resolveKeyCount();
+			if(keysArray == null || keysArray.length < totalColumns)
+			{
+				if(keysArray == null) keysArray = [];
+				keysArray.resize(0);
+				for (i in 0...totalColumns)
+					keysArray.push(i < 4 ? ['note_left','note_down','note_up','note_right'][i] : 'note_ek' + i);
+			}
+			while(strumsBlocked.length < totalColumns) strumsBlocked.push(false);
+
 			generateStaticArrows(0);
 			generateStaticArrows(1);
 			for (i in 0...playerStrums.length) {
@@ -1327,9 +1340,42 @@ class PlayState extends MusicBeatState
 	private var eventsPushed:Array<String> = [];
 	private var totalColumns: Int = 4;
 
+	private function resolveKeyCount():Int
+	{
+		var keys:Int = 4;
+		if(SONG != null && Reflect.hasField(SONG, 'mania') && SONG.mania != null && SONG.mania > 0)
+			keys = Std.int(SONG.mania) + 1; // JS: mania = keyCount-1
+		if(keys < 4) keys = 4;
+		if(keys > 18) keys = 18;
+		return keys;
+	}
+
 	private function generateSong():Void
 	{
 		// FlxG.log.add(ChartParser.parse());
+		totalColumns = resolveKeyCount();
+		// Fit extra-key strums/notes on screen (EK-style narrower spacing).
+		if(totalColumns > 4)
+			Note.swagWidth = Math.min(160 * 0.7, Math.floor((FlxG.width * 0.42) / totalColumns));
+		else
+			Note.swagWidth = 160 * 0.7;
+
+		// Ensure strumsBlocked covers all columns (null-safe on out-of-range noteData).
+		while(strumsBlocked.length < totalColumns) strumsBlocked.push(false);
+
+		// Expand input map for mania > 4 so keysArray/hold checks cover every column.
+		if(keysArray == null) keysArray = [];
+		while(keysArray.length < totalColumns)
+		{
+			var idx:Int = keysArray.length;
+			keysArray.push(idx < 4 ? ['note_left','note_down','note_up','note_right'][idx] : 'note_ek' + idx);
+		}
+		if(keysArray.length > totalColumns) keysArray.resize(totalColumns);
+
+		// Map sing anims for extra keys (clamp to 4 base dirs; EK colors cycle).
+		if(singAnimations == null || singAnimations.length < 4)
+			singAnimations = ['singLEFT', 'singDOWN', 'singUP', 'singRIGHT'];
+
 		songSpeed = PlayState.SONG.speed;
 		songSpeedType = ClientPrefs.getGameplaySetting('scrolltype');
 		switch(songSpeedType)
@@ -1485,7 +1531,7 @@ class PlayState extends MusicBeatState
 						else if(ClientPrefs.data.middleScroll)
 						{
 							sustainNote.x += 310;
-							if(noteColumn > 1) //Up and Right
+							if(noteColumn > Std.int((totalColumns / 2) - 1))
 								sustainNote.x += designHalf + 25;
 						}
 					}
@@ -1495,10 +1541,11 @@ class PlayState extends MusicBeatState
 				{
 					swagNote.x += ((FlxG.height == 720) ? 640 : (FlxG.width / 2));
 				}
-				else if(ClientPrefs.data.middleScroll)
+				else 			if(ClientPrefs.data.middleScroll)
 				{
 					swagNote.x += 310;
-					if(noteColumn > 1) //Up and Right
+					// For mania > 4, split at half key count (not hardcoded > 1).
+					if(noteColumn > Std.int((totalColumns / 2) - 1))
 					{
 						swagNote.x += ((FlxG.height == 720) ? 640 : (FlxG.width / 2)) + 25;
 					}
@@ -1591,7 +1638,8 @@ class PlayState extends MusicBeatState
 		var cutout:Float = CoolUtil.designCutout();
 		var strumLineX:Float = (ClientPrefs.data.middleScroll ? STRUM_X_MIDDLESCROLL : STRUM_X) + cutout;
 		var strumLineY:Float = ClientPrefs.data.downScroll ? (FlxG.height - 150) : 50;
-		for (i in 0...4)
+		var keyCount:Int = (totalColumns != null && totalColumns > 0) ? totalColumns : 4;
+		for (i in 0...keyCount)
 		{
 			// FlxG.log.add(i);
 			var targetAlpha:Float = 1;
@@ -1607,7 +1655,7 @@ class PlayState extends MusicBeatState
 			{
 				//babyArrow.y -= 10;
 				babyArrow.alpha = 0;
-				FlxTween.tween(babyArrow, {/*y: babyArrow.y + 10,*/ alpha: targetAlpha}, 1, {ease: FlxEase.circOut, startDelay: 0.5 + (0.2 * i)});
+				FlxTween.tween(babyArrow, {/*y: babyArrow.y + 10,*/ alpha: targetAlpha}, 1, {ease: FlxEase.circOut, startDelay: 0.5 + (0.2 * (i / keyCount))});
 			}
 			else babyArrow.alpha = targetAlpha;
 
@@ -1618,7 +1666,8 @@ class PlayState extends MusicBeatState
 				if(ClientPrefs.data.middleScroll)
 				{
 					babyArrow.x += 310;
-					if(i > 1) { //Up and Right — design half 640, không dùng FlxG.width/2
+					// For mania > 4, split at half of key count instead of hardcoded 2.
+					if(i > Std.int((keyCount / 2) - 1)) { //Up and Right — design half 640, không dùng FlxG.width/2
 						babyArrow.x += 640 + 25;
 					}
 				}
@@ -3098,7 +3147,7 @@ class PlayState extends MusicBeatState
 			var postfix:String = '';
 			if(note != null) postfix = note.animSuffix;
 
-			var animToPlay:String = singAnimations[Std.int(Math.abs(Math.min(singAnimations.length-1, direction)))] + 'miss' + postfix;
+			var animToPlay:String = singAnimations[Std.int(Math.abs(direction)) % singAnimations.length] + 'miss' + postfix;
 			char.playAnim(animToPlay, true);
 
 			if(char != gf && lastCombo > 5 && gf != null && gf.hasAnimation('sad'))
@@ -3129,7 +3178,7 @@ class PlayState extends MusicBeatState
 		else if(!note.noAnimation)
 		{
 			var char:Character = dad;
-			var animToPlay:String = singAnimations[Std.int(Math.abs(Math.min(singAnimations.length-1, note.noteData)))] + note.animSuffix;
+			var animToPlay:String = singAnimations[Std.int(Math.abs(note.noteData)) % singAnimations.length] + note.animSuffix;
 			if(note.gfNote) char = gf;
 
 			if(char != null)
@@ -3184,7 +3233,7 @@ class PlayState extends MusicBeatState
 		{
 			if(!note.noAnimation)
 			{
-				var animToPlay:String = singAnimations[Std.int(Math.abs(Math.min(singAnimations.length-1, note.noteData)))] + note.animSuffix;
+				var animToPlay:String = singAnimations[Std.int(Math.abs(note.noteData)) % singAnimations.length] + note.animSuffix;
 
 				var char:Character = boyfriend;
 				var animCheck:String = 'hey';

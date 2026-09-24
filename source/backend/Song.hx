@@ -30,6 +30,14 @@ typedef SwagSong =
 
 	@:optional var arrowSkin:String;
 	@:optional var splashSkin:String;
+
+	// Extra Keys / mania (JS-style charts). null/0 = 4 keys.
+	// JS stores mania as keyCount-1 (mania 17 => 18 keys per side).
+	@:optional var mania:Int;
+	@:optional var specialEventsName:String;
+	@:optional var songCredit:String;
+	@:optional var windowName:String;
+	@:optional var event7Value:Dynamic;
 }
 
 typedef SwagSection =
@@ -99,6 +107,29 @@ class Song
 		var sectionsData:Array<SwagSection> = songJson.notes;
 		if(sectionsData == null) return;
 
+		// Determine keys-per-side for dual mania charts (JS: mania = keyCount-1).
+		var keyCount:Int = 4;
+		if(Reflect.hasField(songJson, 'mania') && songJson.mania != null && songJson.mania > 0)
+			keyCount = Std.int(songJson.mania) + 1;
+		if(keyCount < 4) keyCount = 4;
+		if(keyCount > 18) keyCount = 18;
+
+		// Fallback: detect from max raw column if mania missing but dual chart
+		if(keyCount == 4)
+		{
+			var maxCol:Float = 0;
+			for (section in sectionsData)
+				for (note in section.sectionNotes)
+					if(note[1] != null && note[1] > maxCol) maxCol = note[1];
+			if(maxCol > 7)
+				keyCount = Std.int(Math.ceil((maxCol + 1) / 2));
+			if(keyCount < 4) keyCount = 4;
+			if(keyCount > 18) keyCount = 18;
+		}
+
+		// Expose for PlayState / lua
+		songJson.mania = keyCount - 1;
+
 		for (section in sectionsData)
 		{
 			var beats:Null<Float> = cast section.sectionBeats;
@@ -110,8 +141,8 @@ class Song
 
 			for (note in section.sectionNotes)
 			{
-				var gottaHitNote:Bool = (note[1] < 4) ? section.mustHitSection : !section.mustHitSection;
-				note[1] = (note[1] % 4) + (gottaHitNote ? 0 : 4);
+				var gottaHitNote:Bool = (note[1] < keyCount) ? section.mustHitSection : !section.mustHitSection;
+				note[1] = (note[1] % keyCount) + (gottaHitNote ? 0 : keyCount);
 
 				if(!Std.isOfType(note[3], String))
 					note[3] = Note.defaultNoteTypes[note[3]]; //compatibility with Week 7 and 0.1-0.3 psych charts

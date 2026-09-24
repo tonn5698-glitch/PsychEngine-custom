@@ -95,7 +95,12 @@ class Note extends FlxSprite
 
 	public static var SUSTAIN_SIZE:Int = 44;
 	public static var swagWidth:Float = 160 * 0.7;
-	public static var colArray:Array<String> = ['purple', 'blue', 'green', 'red'];
+	// Full EK color set (matches JS Extra Keys / EKNOTE_assets).
+	// Standard NOTE_assets only has the first 4; extra colors are unused unless mania > 4.
+	public static var colArray:Array<String> = ['purple', 'blue', 'green', 'red',
+		'white', 'orange', 'yellow', 'violet', 'darkred', 'dark',
+		'pink', 'turq', 'emerald', 'lightred', 'lime',
+		'darkpurple', 'darkorange', 'cobalt'];
 	public static var defaultNoteSkin(default, never):String = 'noteSkins/NOTE_assets';
 
 	public var noteSplashData:NoteSplashData = {
@@ -267,10 +272,10 @@ class Note extends FlxSprite
 			texture = '';
 
 			x += swagWidth * (noteData);
-			if(!isSustainNote && noteData < colArray.length) { //Doing this 'if' check to fix the warnings on Senpai songs
-				var animToPlay:String = '';
-				animToPlay = colArray[noteData % colArray.length];
-				animation.play(animToPlay + 'Scroll');
+			if(!isSustainNote) {
+				var animToPlay:String = colArray[Std.int(Math.abs(noteData)) % colArray.length];
+				if(animToPlay != null)
+					animation.play(animToPlay + 'Scroll');
 			}
 		}
 
@@ -289,7 +294,8 @@ class Note extends FlxSprite
 			offsetX += width / 2;
 			copyAngle = false;
 
-			animation.play(colArray[noteData % colArray.length] + 'holdend');
+			var sustainCol:String = colArray[Std.int(Math.abs(noteData)) % colArray.length];
+			animation.play(sustainCol + 'holdend');
 
 			updateHitbox();
 
@@ -300,7 +306,8 @@ class Note extends FlxSprite
 
 			if (prevNote.isSustainNote)
 			{
-				prevNote.animation.play(colArray[prevNote.noteData % colArray.length] + 'hold');
+				var prevCol:String = colArray[Std.int(Math.abs(prevNote.noteData)) % colArray.length];
+				prevNote.animation.play(prevCol + 'hold');
 
 				prevNote.scale.y *= Conductor.stepCrochet / 100 * 1.05;
 				if(createdFrom != null && createdFrom.songSpeed != null) prevNote.scale.y *= createdFrom.songSpeed;
@@ -333,9 +340,11 @@ class Note extends FlxSprite
 		if(globalRgbShaders[noteData] == null)
 		{
 			var newRGB:RGBPalette = new RGBPalette();
-			var arr:Array<FlxColor> = (!PlayState.isPixelStage) ? ClientPrefs.data.arrowRGB[noteData] : ClientPrefs.data.arrowRGBPixel[noteData];
-			
-			if (arr != null && noteData > -1 && noteData <= arr.length)
+			// Safe for mania/extra keys — arrowRGB only stores the base 4 colors.
+			var palette:Array<Array<FlxColor>> = (!PlayState.isPixelStage) ? ClientPrefs.data.arrowRGB : ClientPrefs.data.arrowRGBPixel;
+			var arr:Array<FlxColor> = (palette != null && palette.length > 0) ? palette[Std.int(Math.abs(noteData)) % palette.length] : null;
+
+			if (arr != null && arr.length >= 3)
 			{
 				newRGB.r = arr[0];
 				newRGB.g = arr[1];
@@ -433,30 +442,34 @@ class Note extends FlxSprite
 	}
 
 	function loadNoteAnims() {
-		if (colArray[noteData] == null)
+		// Mania charts can exceed the base 4 colors — wrap safely.
+		var col:String = colArray[Std.int(Math.abs(noteData)) % colArray.length];
+		if (col == null)
 			return;
 
 		if (isSustainNote)
 		{
 			attemptToAddAnimationByPrefix('purpleholdend', 'pruple end hold', 24, true); // this fixes some retarded typo from the original note .FLA
-			animation.addByPrefix(colArray[noteData] + 'holdend', colArray[noteData] + ' hold end', 24, true);
-			animation.addByPrefix(colArray[noteData] + 'hold', colArray[noteData] + ' hold piece', 24, true);
+			animation.addByPrefix(col + 'holdend', col + ' hold end', 24, true);
+			animation.addByPrefix(col + 'hold', col + ' hold piece', 24, true);
 		}
-		else animation.addByPrefix(colArray[noteData] + 'Scroll', colArray[noteData] + '0');
+		else animation.addByPrefix(col + 'Scroll', col + '0');
 
 		setGraphicSize(Std.int(width * 0.7));
 		updateHitbox();
 	}
 
 	function loadPixelNoteAnims() {
-		if (colArray[noteData] == null)
+		var colIdx:Int = Std.int(Math.abs(noteData)) % colArray.length;
+		var col:String = colArray[colIdx];
+		if (col == null)
 			return;
 
 		if(isSustainNote)
 		{
-			animation.add(colArray[noteData] + 'holdend', [noteData + 4], 24, true);
-			animation.add(colArray[noteData] + 'hold', [noteData], 24, true);
-		} else animation.add(colArray[noteData] + 'Scroll', [noteData + 4], 24, true);
+			animation.add(col + 'holdend', [colIdx + 4], 24, true);
+			animation.add(col + 'hold', [colIdx], 24, true);
+		} else animation.add(col + 'Scroll', [colIdx + 4], 24, true);
 	}
 
 	function attemptToAddAnimationByPrefix(name:String, prefix:String, framerate:Float = 24, doLoop:Bool = true)
