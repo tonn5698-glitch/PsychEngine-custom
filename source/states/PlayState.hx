@@ -3191,7 +3191,13 @@ class PlayState extends MusicBeatState
 					if(char.getAnimationName() == holdAnim || char.getAnimationName() == holdAnim + '-loop') canPlay = false;
 				}
 
-				if(canPlay) char.playAnim(animToPlay, true);
+				if(canPlay)
+				{
+					// Same-direction spam: don't reset to frame 0 every note (looked like broken loop / no hit).
+					var curA:String = char.getAnimationName();
+					var same:Bool = (curA == animToPlay && char.animation.curAnim != null && !char.animation.curAnim.finished);
+					if(!same) char.playAnim(animToPlay, true);
+				}
 				char.holdTimer = 0;
 			}
 		}
