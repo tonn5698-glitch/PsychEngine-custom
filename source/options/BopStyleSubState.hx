@@ -2,7 +2,6 @@ package options;
 
 import flixel.FlxSprite;
 import flixel.text.FlxText;
-import flixel.text.FlxTextBorderStyle;
 import backend.FunkyMode;
 
 /**
