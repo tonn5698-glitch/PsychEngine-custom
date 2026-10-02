@@ -55,6 +55,28 @@ append_new(){
   cp "$LOGDIR/$run.log" "$LOGDIR/latest.log"
   # status summary (job progress) — có giá trị ngay cả khi log còn trống
   gh run view --repo "$REPO" "$run" 2>/dev/null > "$LOGDIR/$run.status.log"
+  write_report "$run"
+}
+
+# Báo cáo MẪU ngắn gọn (opencode chỉ cần cat file này → đỡ token)
+write_report(){
+  local run="$1"
+  local json status conclusion title branch
+  json="$(gh run view --repo "$REPO" "$run" --json status,conclusion,displayTitle,headBranch 2>/dev/null)"
+  status="$(echo "$json" | jq -r '.status // ""')"
+  conclusion="$(echo "$json" | jq -r '.conclusion // "…"')"
+  title="$(echo "$json" | jq -r '.displayTitle // ""' | cut -c1-60)"
+  branch="$(echo "$json" | jq -r '.headBranch // ""')"
+  {
+    echo "[CI] #$run ($branch)"
+    echo "TITLE : $title"
+    echo "STATE : ${status:-?} · ${conclusion:-…}"
+    echo "LOG   : $(wc -c < "$LOGDIR/$run.log" 2>/dev/null || echo 0) bytes ($run.log)"
+    if [[ -f "$LOGDIR/$run.error.log" ]]; then
+      echo "ERRS  : CÓ LỖI → logs/ci/$run.error.log"
+    fi
+  } > "$LOGDIR/report.txt"
+  cp "$LOGDIR/report.txt" "$LOGDIR/latest_report.txt"
 }
 
 watch_run(){
@@ -70,12 +92,14 @@ watch_run(){
       append_new "$run"
       log "== run #$run DONE =="
       gh run view --repo "$REPO" "$run" 2>/dev/null | tee -a "$LOGDIR/$run.log"
+      write_report "$run"
       # dump log-failed nếu build fail (để opencode đọc nhanh lỗi compile)
       local conclusion
       conclusion="$(gh run view --repo "$REPO" "$run" --json conclusion --jq .conclusion 2>/dev/null)"
       if [[ "$conclusion" == "failure" || "$conclusion" == "cancelled" ]]; then
         log "conclusion=$conclusion — dump log-failed → $LOGDIR/$run.error.log"
         gh run view --repo "$REPO" "$run" --log-failed 2>/dev/null > "$LOGDIR/$run.error.log"
+        write_report "$run"
       fi
       return 0
     fi
