@@ -2,6 +2,7 @@ package states.editors;
 
 import backend.Song;
 import backend.StageData;
+import objects.Character;
 import states.editors.content.FileDialogHandler;
 import states.editors.content.PsychJsonPrinter;
 
@@ -232,7 +233,7 @@ class CameraEditorState extends MusicBeatState
         if(vcam==null)return;
         var w=FlxG.width-PANEL,h=FlxG.height-HEADER-TIMELINE,cx=w/2,cy=HEADER+h/2;
         var aspect=extended?20/9:16/9; var vh=Math.min(h*.78,w/aspect*.78),vw=vh*aspect;
-        vcam.makeGraphic(Std.int(vw),Std.int(vh),FlxColor.TRANSPARENT); vcam.drawFrame(true,FlxColor.WHITE,2);
+        vcam.makeGraphic(Std.int(vw),Std.int(vh),FlxColor.WHITE); vcam.alpha=0.08;
         vcam.x=cx-vw/2;vcam.y=cy-vh/2;vcam.visible=true;
         mask.makeGraphic(w,h,FlxColor.BLACK);mask.x=0;mask.y=HEADER;mask.alpha=pass?passAlpha:0;
     }
@@ -240,17 +241,21 @@ class CameraEditorState extends MusicBeatState
     function updateProperties()
     {
         if(selected<0||selected>=events.length){return;}
-        var e=events[selected],n=e[1][0][0],a=Std.parseFloat(Std.string(e[1][0].length>1?e[1][0][1]:'0')),b=Std.parseFloat(Std.string(e[1][0].length>2?e[1][0][2]:'0'));
+        var e:Array<Dynamic>=cast events[selected];
+        var row:Array<Dynamic>=cast e[1][0];
+        var n:String=Std.string(row[0]),a=Std.parseFloat(Std.string(row.length>1?row[1]:'0')),b=Std.parseFloat(Std.string(row.length>2?row[2]:'0'));
         if(n=='Camera Follow Pos'||n=='Focus Camera'){xBox.value=a;yBox.value=b;zoomBox.value=1;}else{xBox.value=0;yBox.value=0;zoomBox.value=1+a;}
-        durBox.value=duration(selected);timeBox.value=e[0];zoomSlider.value=zoomBox.value;
+        durBox.value=duration(selected);timeBox.value=Std.parseFloat(Std.string(e[0]));zoomSlider.value=zoomBox.value;
     }
 
     function propertyChanged()
     {
         if(selected<0||selected>=events.length)return;
-        var e=events[selected],n=e[1][0][0];
-        if(n=='Camera Follow Pos'||n=='Focus Camera'){e[1][0][1]=Std.string(xBox.value);e[1][0][2]=Std.string(yBox.value);}
-        else e[1][0][1]=Std.string(zoomBox.value-1);
+        var e:Array<Dynamic>=cast events[selected];
+        var row:Array<Dynamic>=cast e[1][0];
+        var n:String=Std.string(row[0]);
+        if(n=='Camera Follow Pos'||n=='Focus Camera'){row[1]=Std.string(xBox.value);row[2]=Std.string(yBox.value);}
+        else row[1]=Std.string(zoomBox.value-1);
         e[0]=snapTime(timeBox.value);
         var m=metaFor(selected);if(m==null){m={index:selected,duration:DURATION,layer:'Default'};meta.push(m);}m.duration=durBox.value;
         refresh();evaluate();
@@ -259,7 +264,13 @@ class CameraEditorState extends MusicBeatState
     function copySelected()
     {
         copied=[];if(selectedMany.length==0&&selected>=0)selectedMany=[selected];if(selectedMany.length==0)return;
-        var base=events[selectedMany[0]][0];for(i in selectedMany){var e=events[i];copied.push([e[0]-base,[[e[1][0][0],e[1][0][1],e[1][0].length>2?e[1][0][2]:'']],duration(i)]);}
+        var base:Float=Std.parseFloat(Std.string((cast events[selectedMany[0]]:Array<Dynamic>)[0]));
+        for(i in selectedMany)
+        {
+            var e:Array<Dynamic>=cast events[i];
+            var row:Array<Dynamic>=cast e[1][0];
+            copied.push([Std.parseFloat(Std.string(e[0]))-base,[[row[0],row.length>1?row[1]:'',row.length>2?row[2]:'']],duration(i)]);
+        }
     }
     function pasteSelected()
     {
@@ -300,7 +311,7 @@ class CameraEditorState extends MusicBeatState
     }
 
     function redoDummy(){}
-    function chartLength():Float{var m:Float=0;for(e in events)if(e!=null)m=Math.max(m,e[0]+duration(events.indexOf(e)));return m+1000;}
+    function chartLength():Float{var m:Float=0;for(e in events)if(e!=null)m=Math.max(m,Std.parseFloat(Std.string((cast e:Array<Dynamic>)[0]))+duration(events.indexOf(e)));return m+1000;}
 
     function saveChart()
     {
