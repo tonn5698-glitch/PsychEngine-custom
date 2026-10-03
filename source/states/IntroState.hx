@@ -240,6 +240,7 @@ class IntroState extends MusicBeatState
 		if (!TitleState.initialized)
 		{
 			ClientPrefs.loadPrefs();
+			backend.HaxeLog.init();
 			Language.reloadPhrases();
 			MobileData.init();
 			TitleState.initialized = true; // Title (nếu BACK về) sẽ skipIntro, không load lại

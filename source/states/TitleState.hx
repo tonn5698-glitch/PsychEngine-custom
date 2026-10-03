@@ -73,6 +73,7 @@ class TitleState extends MusicBeatState
 		if(!initialized)
 		{
 			ClientPrefs.loadPrefs();
+			backend.HaxeLog.init();
 			Language.reloadPhrases();
 		}
 
