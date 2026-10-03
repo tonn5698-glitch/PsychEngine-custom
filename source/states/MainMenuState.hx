@@ -49,8 +49,10 @@ class MainMenuState extends MusicBeatState
 	{
 		var result:Array<{name:String, mod:String}> = [];
 		#if MODS_ALLOWED
-		var mods:Array<String> = Mods.getModDirectories();
-		for (mod in mods)
+		// Chỉ scan state của mod đang ENABLED. Mod disabled vẫn tồn tại trên disk
+		// nên getModDirectories() một mình sẽ khiến state của mod đã tắt vẫn bị chạy.
+		var enabledMods:Array<String> = Mods.parseList().enabled;
+		for (mod in enabledMods)
 		{
 			var dir:String = Paths.mods(mod + '/data/states/');
 			if (FileSystem.exists(dir))
