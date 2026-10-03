@@ -103,8 +103,10 @@ class CrashHandler
 			stackLabel = 'Stack trace unavailable: ' + e;
 		}
 
-		// Save crash log
+		// Save crash log + copy the crash into the active Haxe runtime log.
 		saveCrashLog(m, stackLabel);
+		HaxeLog.error(m, 'CrashHandler');
+		if (stackLabel.length > 0) HaxeLog.error(stackLabel, 'StackTrace');
 
 		// Defer state switch — KHÔNG switch ngay trong error callback
 		pendingMsg = m;
@@ -128,6 +130,8 @@ class CrashHandler
 		} catch (e:Dynamic) {}
 
 		saveCrashLog(msg, stackStr);
+		HaxeLog.error(msg, 'CriticalError');
+		if (stackStr.length > 0) HaxeLog.error(stackStr, 'StackTrace');
 
 		pendingMsg = msg;
 		pendingStack = stackStr;

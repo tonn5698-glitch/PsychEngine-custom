@@ -1,5 +1,6 @@
 package states.editors;
 
+import haxe.Json;
 import backend.Song;
 import backend.StageData;
 import objects.Character;
@@ -34,6 +35,22 @@ class CameraEditorState extends MusicBeatState
     var extended:Bool = false;
     var pass:Bool = true;
     var passAlpha:Float = 0.65;
+    var undoStack:Array<String> = [];
+    var redoStack:Array<String> = [];
+    var dragIndex:Int = -1;
+    var dragging:Bool = false;
+    var resizing:Bool = false;
+    var dragStartX:Float = 0;
+    var dragStartTime:Float = 0;
+    var dragStartDuration:Float = 0;
+    var panPreview:Bool = false;
+    var panStartX:Float = 0;
+    var panStartY:Float = 0;
+    var panStartScrollX:Float = 0;
+    var panStartScrollY:Float = 0;
+    #if FLX_TOUCH
+    var touchPinchDist:Float = 0;
+    #end
 
     var blocks:Array<FlxSprite> = [];
     var labels:Array<FlxText> = [];
@@ -203,11 +220,22 @@ class CameraEditorState extends MusicBeatState
 
     function addEvent(kind:String)
     {
+        pushUndo();
         var t=snapTime(time);
         var e:Dynamic=kind=='Focus Camera'?[t,[['Camera Follow Pos','640','360']]]:[t,[['Add Camera Zoom','0.1','0.03']]];
-        var i=events.length; events.push(e); meta.push({index:i,duration:DURATION,layer:layers[layer]});
+        var i=events.length; events.push(e); meta.push({index:i,duration:DURATION,layer:layers[layer],ease:'linear',easeDir:'out'});
         selected=i; selectedMany=[i]; refresh(); seek(t); updateProperties();
     }
+    function snapshot():String return Json.stringify({events:events,meta:meta,layers:layers});
+    function restoreSnapshot(s:String)
+    {
+        var d:Dynamic=Json.parse(s); events=cast d.events; meta=cast d.meta; layers=cast d.layers;
+        if(layers==null||layers.length==0)layers=['Default'];
+        selected=-1;selectedMany=[];refresh();evaluate();
+    }
+    function pushUndo(){undoStack.push(snapshot());if(undoStack.length>80)undoStack.shift();redoStack=[];}
+    function undo(){if(undoStack.length==0)return;redoStack.push(snapshot());restoreSnapshot(undoStack.pop());}
+    function redo(){if(redoStack.length==0)return;undoStack.push(snapshot());restoreSnapshot(redoStack.pop());}
     function addLayer(){layers.push('Layer '+(layers.length+1));layer=layers.length-1;refresh();}
 
     function seek(t:Float)
@@ -215,19 +243,29 @@ class CameraEditorState extends MusicBeatState
         time=Math.max(0,t); Conductor.songPosition=time; Conductor.mapBPMChanges(song); evaluate(); refresh(); updateProperties();
     }
 
+    function easeValue(t:Float,name:String,dir:String):Float
+    {
+        var x=Math.max(0,Math.min(1,t)),v=x;
+        switch(name){case 'sine':v=1-Math.cos(x*Math.PI/2);case 'quad':v=x*x;case 'cube':v=x*x*x;case 'quart':v=x*x*x*x;case 'quint':v=x*x*x*x*x;case 'expo':v=x==0?0:Math.pow(2,10*(x-1));case 'circ':v=1-Math.sqrt(1-x*x);case 'back':v=x*x*(2.70158*x-1.70158);case 'bounce':if(x<1/2.75)v=7.5625*x*x;else if(x<2/2.75){x-=1.5/2.75;v=7.5625*x*x+.75;}else if(x<2.5/2.75){x-=2.25/2.75;v=7.5625*x*x+.9375;}else{x-=2.625/2.75;v=7.5625*x*x+.984375;}}
+        if(dir=='in')return v;if(dir=='out')return 1-easeValue(1-v,name,'in');return x<.5?easeValue(x*2,name,'out')/2:easeValue(x*2-1,name,'in')/2+.5;
+    }
     function evaluate()
     {
-        var sx:Float=640,sy:Float=360,z:Float=StageData.getStageFile(song.stage==null?StageData.vanillaSongStage(song.song):song.stage).defaultZoom;
-        for(e in events) if(isCam(e)&&e[0]<=time)
+        var sf=StageData.getStageFile(song.stage==null?StageData.vanillaSongStage(song.song):song.stage);
+        var sx:Float=640,sy:Float=360,z:Float=sf.defaultZoom;
+        var focus:Array<Int>=[],zooms:Array<Int>=[];
+        for(i in 0...events.length)if(isCam(events[i])){var n=Std.string(events[i][1][0][0]);if(n=='Camera Follow Pos'||n=='Focus Camera')focus.push(i);if(n=='Add Camera Zoom'||n=='Zoom Camera')zooms.push(i);}
+        focus.sort(function(a,b)return events[a][0]<events[b][0]?-1:1);zooms.sort(function(a,b)return events[a][0]<events[b][0]?-1:1);
+        for(k in 0...focus.length)
         {
-            var n=e[1][0][0];
-            if(n=='Camera Follow Pos'||n=='Focus Camera'){sx=Std.parseFloat(Std.string(e[1][0][1]));sy=Std.parseFloat(Std.string(e[1][0][2]));}
-            if(n=='Add Camera Zoom'||n=='Zoom Camera'){var a=Std.parseFloat(Std.string(e[1][0][1]));if(!Math.isNaN(a))z+=a;}
+            var i=focus[k],e:Array<Dynamic>=cast events[i],et=Std.parseFloat(Std.string(e[0]));if(time<et)break;
+            sx=Std.parseFloat(Std.string(e[1][0][1]));sy=Std.parseFloat(Std.string(e[1][0][2]));
+            if(k+1<focus.length){var ni=focus[k+1],ne:Array<Dynamic>=cast events[ni],nt=Std.parseFloat(Std.string(ne[0]));if(time<nt&&nt>et){var m=metaFor(i),dur=m==null?DURATION:Std.parseFloat(Std.string(Reflect.field(m,'duration'))),p=Math.max(0,Math.min(1,(time-et)/Math.max(1,Math.min(dur,nt-et)))),en=m!=null&&Reflect.hasField(m,'ease')?Std.string(Reflect.field(m,'ease')):'linear',ed=m!=null&&Reflect.hasField(m,'easeDir')?Std.string(Reflect.field(m,'easeDir')):'out';p=easeValue(p,en,ed);sx+=(Std.parseFloat(Std.string(ne[1][0][1]))-sx)*p;sy+=(Std.parseFloat(Std.string(ne[1][0][2]))-sy)*p;}}
         }
+        for(i in zooms)if(Std.parseFloat(Std.string(events[i][0]))<=time){var a=Std.parseFloat(Std.string(events[i][1][0][1]));if(!Math.isNaN(a))z+=a;}
         if(!relative){preview.zoom=Math.max(.1,z);preview.scroll.set(sx-preview.width/(2*preview.zoom),sy-preview.height/(2*preview.zoom));}
         overlay();
     }
-
     function overlay()
     {
         if(vcam==null)return;
@@ -278,7 +316,8 @@ class CameraEditorState extends MusicBeatState
     }
     function deleteSelected()
     {
-        if(selectedMany.length==0&&selected>=0)selectedMany=[selected];selectedMany.sort(function(a,b)return b-a);
+        if(selectedMany.length==0&&selected>=0)selectedMany=[selected];
+        if(selectedMany.length>0)pushUndo();selectedMany.sort(function(a,b)return b-a);
         for(i in selectedMany)if(i>=0&&i<events.length)events.splice(i,1);
         selected=-1;selectedMany=[];refresh();
     }
@@ -288,34 +327,66 @@ class CameraEditorState extends MusicBeatState
         if(song==null){super.update(elapsed);return;}
         if(controls.BACK||FlxG.keys.justPressed.ESCAPE){closeEditor();return;}
         if(playing){seek(time+elapsed*1000);if(time>chartLength())seek(0);}
+        #if FLX_TOUCH
+        if(FlxG.touches != null && FlxG.touches.list.length >= 2)
+        {
+            var ta=FlxG.touches.list[0];
+            var tb=FlxG.touches.list[1];
+            var dx=ta.x-tb.x;
+            var dy=ta.y-tb.y;
+            var dist=Math.sqrt(dx*dx+dy*dy);
+            if(touchPinchDist>0 && dist>1)
+            {
+                preview.zoom=Math.max(.25,Math.min(4,preview.zoom*(dist/touchPinchDist)));
+                overlay();
+            }
+            touchPinchDist=dist;
+        }
+        else touchPinchDist=0;
+        #end
         if(FlxG.mouse.wheel!=0)
         {
-            if(FlxG.mouse.y>=FlxG.height-TIMELINE){if(FlxG.keys.pressed.SHIFT){timelineZoom=Math.max(.02,Math.min(1,timelineZoom+FlxG.mouse.wheel*.01));refresh();}else if(FlxG.keys.pressed.CONTROL){layer=Std.int(FlxMath.bound(layer-FlxG.mouse.wheel,0,layers.length-1));refresh();}else{timelinePan=Math.max(0,timelinePan-FlxG.mouse.wheel*500/timelineZoom);refresh();}}
-            else if(FlxG.mouse.x<FlxG.width-PANEL){preview.zoom=Math.max(.25,Math.min(3,preview.zoom+FlxG.mouse.wheel*.1));}
+            if(FlxG.mouse.y>=FlxG.height-TIMELINE){if(FlxG.keys.pressed.SHIFT)timelineZoom=Math.max(.02,Math.min(2,timelineZoom+FlxG.mouse.wheel*.01));else timelinePan=Math.max(0,timelinePan-FlxG.mouse.wheel*500/timelineZoom);refresh();}
+            else if(FlxG.mouse.x<FlxG.width-PANEL){preview.zoom=Math.max(.25,Math.min(4,preview.zoom+FlxG.mouse.wheel*.1));overlay();}
         }
         if(FlxG.mouse.justPressed)
         {
             if(FlxG.mouse.y>=FlxG.height-TIMELINE&&FlxG.mouse.x<FlxG.width-PANEL)
             {
-                var hit=-1;for(b in blocks)if(FlxG.mouse.overlaps(b,FlxG.camera))hit=b.ID;
-                if(hit>=0){selected=hit;if(FlxG.keys.pressed.SHIFT){if(selectedMany.contains(hit))selectedMany.remove(hit);else selectedMany.push(hit);}else selectedMany=[hit];updateProperties();}
+                var hit=-1;var resize=false;for(b in blocks)if(FlxG.mouse.overlaps(b,FlxG.camera)){hit=b.ID;if(Math.abs(FlxG.mouse.x-(b.x+b.width))<16)resize=true;break;}
+                if(hit>=0){pushUndo();selected=hit;if(FlxG.keys.pressed.SHIFT){if(selectedMany.contains(hit))selectedMany.remove(hit);else selectedMany.push(hit);}else selectedMany=[hit];updateProperties();dragIndex=hit;dragStartX=FlxG.mouse.x;dragStartTime=Std.parseFloat(Std.string(events[hit][0]));dragStartDuration=duration(hit);dragging=!resize;resizing=resize;}
                 else seek(mouseTime());
             }
+            else if(FlxG.mouse.y>=HEADER&&FlxG.mouse.y<FlxG.height-TIMELINE&&FlxG.mouse.x<FlxG.width-PANEL){panPreview=true;panStartX=FlxG.mouse.x;panStartY=FlxG.mouse.y;panStartScrollX=preview.scroll.x;panStartScrollY=preview.scroll.y;}
         }
+        if(FlxG.mouse.pressed)
+        {
+            if(dragIndex>=0){var dx=FlxG.mouse.x-dragStartX;var ev:Array<Dynamic>=cast events[dragIndex];if(dragging)ev[0]=Math.max(0,snapTime(dragStartTime+dx/timelineZoom));if(resizing){var m=metaFor(dragIndex);if(m!=null)m.duration=Math.max(0,dragStartDuration+dx/timelineZoom);}refresh();evaluate();}
+            else if(panPreview){preview.scroll.x=panStartScrollX-(FlxG.mouse.x-panStartX)/preview.zoom;preview.scroll.y=panStartScrollY-(FlxG.mouse.y-panStartY)/preview.zoom;}
+        }
+        if(FlxG.mouse.justReleased){dragIndex=-1;dragging=false;resizing=false;panPreview=false;}
         if(FlxG.mouse.justPressedRight&&FlxG.mouse.y>=FlxG.height-TIMELINE&&FlxG.mouse.x<FlxG.width-PANEL)addEvent(FlxG.keys.pressed.SHIFT?'Zoom Camera':'Focus Camera');
         if(FlxG.keys.justPressed.DELETE||FlxG.keys.justPressed.BACKSPACE)deleteSelected();
         if(FlxG.keys.justPressed.C&&FlxG.keys.pressed.CONTROL)copySelected();
         if(FlxG.keys.justPressed.V&&FlxG.keys.pressed.CONTROL)pasteSelected();
-        if(FlxG.keys.justPressed.Y&&FlxG.keys.pressed.CONTROL)redoDummy();
+        if(FlxG.keys.justPressed.Z&&FlxG.keys.pressed.CONTROL){if(FlxG.keys.pressed.SHIFT)redo();else undo();}
+        if(FlxG.keys.justPressed.Y&&FlxG.keys.pressed.CONTROL)redo();
         super.update(elapsed);
     }
 
-    function redoDummy(){}
     function chartLength():Float{var m:Float=0;for(e in events)if(e!=null)m=Math.max(m,Std.parseFloat(Std.string((cast e:Array<Dynamic>)[0]))+duration(events.indexOf(e)));return m+1000;}
 
     function saveChart()
     {
-        Reflect.setField(song,'cameraEditor',meta);song.events=events;
+        var savedMeta:Array<Dynamic>=[];
+        for(i in 0...events.length)
+        {
+            var m=metaFor(i);
+            savedMeta.push({index:i,duration:m==null?DURATION:m.duration,layer:m==null?'Default':m.layer,
+                ease:m!=null&&Reflect.hasField(m,'ease')?m.ease:'linear',
+                easeDir:m!=null&&Reflect.hasField(m,'easeDir')?m.easeDir:'out'});
+        }
+        Reflect.setField(song,'cameraEditor',savedMeta);song.events=events;
         var data=PsychJsonPrinter.print(song,['sectionNotes','events']);
         #if mobile
         if(Song.chartPath!=null)StorageUtil.saveContent(Song.chartPath.substr(Song.chartPath.lastIndexOf('/')+1),data);

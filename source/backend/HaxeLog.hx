@@ -26,7 +26,15 @@ class HaxeLog
 	 */
 	public static function init():Void
 	{
-		if (!ClientPrefs.data.enableHaxeLogs) return;
+		// Main calls this before ClientPrefs.loadPrefs(), so read the saved value directly.
+		var shouldEnable:Bool = ClientPrefs.data.enableHaxeLogs;
+		#if sys
+		try {
+			if (FlxG.save != null && FlxG.save.data != null && FlxG.save.data.enableHaxeLogs != null)
+				shouldEnable = FlxG.save.data.enableHaxeLogs;
+		} catch (e:Dynamic) {}
+		#end
+		if (!shouldEnable) return;
 
 		try {
 			#if sys
