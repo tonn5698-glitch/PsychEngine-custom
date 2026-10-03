@@ -10,7 +10,8 @@ class OsuButton extends FlxSpriteGroup
 	public var shiftX:Float = 0;
 	public var btnW:Int;
 	public var btnH:Int;
-	public var selected(default, set):Bool = false;
+	var _selected:Bool = false;
+	public var selected(get, set):Bool;
 
 	public function new(x:Float, y:Float, w:Int, h:Int, label:String, color:FlxColor, size:Int = 30)
 	{
@@ -33,9 +34,14 @@ class OsuButton extends FlxSpriteGroup
 		set_selected(false);
 	}
 
+	function get_selected():Bool
+	{
+		return _selected;
+	}
+
 	function set_selected(v:Bool):Bool
 	{
-		selected = v;
+		_selected = v;
 		bg.color = v ? baseColor : FlxColor.interpolate(baseColor, FlxColor.BLACK, 0.55);
 		return v;
 	}
