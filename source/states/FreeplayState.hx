@@ -76,6 +76,13 @@ class FreeplayState extends MusicBeatState
 
 	override function create()
 	{
+		if (ClientPrefs.data.osuFreeplay)
+		{
+			persistentUpdate = false;
+			MusicBeatState.switchState(new states.OsuFreeplayState());
+			return;
+		}
+
 		//Paths.clearStoredMemory();
 		//Paths.clearUnusedMemory();
 		

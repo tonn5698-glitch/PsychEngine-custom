@@ -45,14 +45,8 @@ class ExperimentSubState extends BaseOptionsMenu
 		addOption(option);
 
 		option = new Option('OSU Freeplay',
-			'Open the built-in osu-style Freeplay menu.
-It is integrated directly into the engine.',
-			'osuFreeplay', STRING, ['Open']);
-		option.onAccept = () ->
-		{
-			persistentUpdate = false;
-			MusicBeatState.switchState(new states.OsuFreeplayState());
-		};
+			'If checked, the normal Freeplay menu will always open the built-in osu-style Freeplay.',
+			'osuFreeplay', BOOL);
 		addOption(option);
 
 		option = new Option('Enable Custom Intro Video',
