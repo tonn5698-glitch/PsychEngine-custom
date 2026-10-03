@@ -1,6 +1,7 @@
 package options;
 
 import backend.FunkyMode;
+import backend.MusicBeatState;
 
 class ExperimentSubState extends BaseOptionsMenu
 {
@@ -41,6 +42,17 @@ class ExperimentSubState extends BaseOptionsMenu
 		option = new Option('Skip Title After Intro',
 			'If checked, after intro.mp4 ends (or is skipped) the game fades directly into the Main Menu.\nThe intro video is muted and freakyMenu starts immediately.\nSkips the Title Screen.',
 			'introToMenu', BOOL);
+		addOption(option);
+
+		option = new Option('OSU Freeplay',
+			'Open the built-in osu-style Freeplay menu.
+It is integrated directly into the engine.',
+			'osuFreeplay', STRING, ['Open']);
+		option.onAccept = () ->
+		{
+			persistentUpdate = false;
+			MusicBeatState.switchState(new states.OsuFreeplayState());
+		};
 		addOption(option);
 
 		option = new Option('Enable Custom Intro Video',

@@ -5,9 +5,9 @@ import backend.Highscore;
 import backend.Song;
 import states.StoryMenuState;
 
-#if LUA_ALLOWED
 class CustomFreeplayFunctions
 {
+	#if LUA_ALLOWED
 	public static function implement(funk:FunkinLua)
 	{
 		var lua = funk.lua;
@@ -16,6 +16,7 @@ class CustomFreeplayFunctions
 		Lua_helper.add_callback(lua, "getFreeplayScore", getFreeplayScore);
 		Lua_helper.add_callback(lua, "playFreeplaySong", playFreeplaySong);
 	}
+	#end
 
 	/**
 	 * Trả về mảng bài hát dạng bảng Lua: {songName, week, character, color, folder}.
@@ -96,4 +97,3 @@ class CustomFreeplayFunctions
 		return true;
 	}
 }
-#end
