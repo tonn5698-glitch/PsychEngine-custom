@@ -214,6 +214,10 @@ class OsuFreeplayState extends MusicBeatState
 			c.alpha = sel ? 1 : 0.55;
 		}
 
+		// Difficulty button visual state is owned only by curDiff.
+		for (i in 0...diffBtns.length)
+			diffBtns[i].selected = (i == curDiff);
+
 		super.update(elapsed);
 	}
 }
