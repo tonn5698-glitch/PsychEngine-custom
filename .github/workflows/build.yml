@@ -32,7 +32,7 @@ jobs:
     runs-on: ${{ inputs.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@main
+        uses: actions/checkout@v5
 
       - name: Setup Haxe
         uses: krdlab/setup-haxe@master
@@ -40,7 +40,7 @@ jobs:
           haxe-version: ${{ env.HAXE_VERSION }}
 
       - name: Cache haxelib
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/haxelib
           key: haxelib-${{ runner.os }}-${{ hashFiles('setup/unix.sh', 'Project.xml') }}
@@ -54,7 +54,7 @@ jobs:
         with:
           ndk-version: r27c
           add-to-path: false
-          cache: both
+          local-cache: true
 
       - name: Install libVLC
         if: contains(inputs.name, 'Linux')
@@ -73,7 +73,7 @@ jobs:
 
       - name: Cache hxcpp build objects
         if: inputs.name == 'Android'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             export/debug/android/obj
@@ -84,7 +84,7 @@ jobs:
 
       - name: Cache Gradle
         if: inputs.name == 'Android'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -110,7 +110,7 @@ jobs:
           zip -r ${{ env.PROJECT_NAME }}.ipa Payload
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ inputs.artifactName }}
           path: ${{ inputs.artifactPath }}
