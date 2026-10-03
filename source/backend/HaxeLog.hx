@@ -18,7 +18,7 @@ class HaxeLog
 	public static var logPath:String = '';
 
 	static var buffer:Array<String> = [];
-	static var flushThreshold:Int = 20; // flush sau mỗi N dòng
+	static var flushThreshold:Int = 1; // flush ngay từng dòng để không mất log khi crash
 	static var currentSession:String = '';
 
 	/**

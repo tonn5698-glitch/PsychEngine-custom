@@ -1,6 +1,7 @@
 package states;
 
 import backend.WeekData;
+import backend.HaxeLog;
 import backend.Highscore;
 import backend.Song;
 import backend.Mods;
@@ -79,8 +80,10 @@ class FreeplayState extends MusicBeatState
 		//Paths.clearUnusedMemory();
 		
 		persistentUpdate = true;
+		HaxeLog.write('[FreeplayState] create() start');
 		PlayState.isStoryMode = false;
 		WeekData.reloadWeekFiles(false);
+		HaxeLog.write('[FreeplayState] weeks loaded: ' + WeekData.weeksList.length);
 
 		#if DISCORD_ALLOWED
 		// Updating Discord Rich Presence
@@ -146,6 +149,7 @@ class FreeplayState extends MusicBeatState
 				addSong(song[0], i, song[1], FlxColor.fromRGB(colors[0], colors[1], colors[2]));
 			}
 		}
+		HaxeLog.write('[FreeplayState] songs collected: ' + songs.length + ', filter=' + freeplayFilterMod + ', mod=' + Mods.currentModDirectory);
 		Mods.loadTopMod();
 
 		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
@@ -214,6 +218,7 @@ class FreeplayState extends MusicBeatState
 		missingText.visible = false;
 		add(missingText);
 
+		HaxeLog.write('[FreeplayState] before song access: songs=' + songs.length + ', curSelected=' + curSelected);
 		if(curSelected >= songs.length) curSelected = 0;
 		bg.color = songs[curSelected].color;
 		intendedColor = bg.color;
