@@ -1,0 +1,893 @@
+Bạn đang làm việc trực tiếp trên repository:
+
+https://github.com/tonn5698-glitch/PsychEngine-custom
+
+Mục tiêu: PORT tính năng Camera Editor của Friday Night Funkin' từ bài viết chính thức:
+
+https://funkin.me/blog/2026-04-21/
+
+vào PsychEngine-Custom, nhưng phải thích nghi với kiến trúc Psych Engine hiện tại. Không được copy nguyên kiến trúc V-Slice/.fnfc nếu nó không phù hợp với engine này.
+
+1. Tính năng cần port
+
+Hãy xây dựng một Camera Editor State riêng trong PsychEngine-Custom, lấy cảm hứng trực tiếp từ Camera Editor chính thức của FNF.
+
+Camera Editor cần có layout tương tự:
+
++--------------------------------------------------------------+
+|                        Stage Preview                         |
+|                                                              |
+|                    [ Virtual Camera ]                        |
+|                                                              |
+|                                                              |
++--------------------------------------------+-----------------+
+|                 Timeline                   |   Properties    |
+|                                            |     Panel       |
+| Default  |----Focus Camera----|            |                 |
+| Layer 2  |---------Zoom--------|            | Position X     |
+| Layer 3  |----Focus----|                   | Position Y     |
+|                                            | Zoom            |
+|                                            | Duration        |
++--------------------------------------------+-----------------+
+
+Không cần pixel-perfect với FNF V-Slice. Ưu tiên UI rõ ràng, ổn định và phù hợp với Psych Engine.
+
+---
+
+2. Trước khi code: PHẢI kiểm tra repository
+
+Đọc và hiểu trước:
+
+- "AGENTS.md"
+- "source/states/editors/ChartingState.hx"
+- "source/states/editors/content/EditorPlayState.hx"
+- "source/states/editors/MasterEditorMenu.hx"
+- các class liên quan đến:
+  - "EventMetaNote"
+  - chart events
+  - camera follow
+  - camera zoom
+  - "PlayState"
+  - "StageData"
+  - "Song"
+  - "PsychUI"
+  - undo/redo
+  - file save/load
+
+Đặc biệt phải xác định chính xác cách PsychEngine-Custom hiện tại lưu:
+
+- event time
+- event name
+- event value 1
+- event value 2
+- duration nếu có
+- camera position
+- camera zoom
+
+Không tự ý tạo format chart mới nếu format hiện tại đã đủ để lưu dữ liệu.
+
+Nếu cần thêm metadata cho Camera Editor, hãy thiết kế backward-compatible.
+
+Không được phá format chart/event hiện tại.
+
+---
+
+3. Kiến trúc mong muốn
+
+Ưu tiên tạo state riêng, ví dụ:
+
+source/states/editors/CameraEditorState.hx
+
+Có thể tạo thêm các class phụ nếu thực sự cần, ví dụ:
+
+source/states/editors/camera/
+    CameraTimeline.hx
+    CameraTimelineEvent.hx
+    CameraEditorProperties.hx
+    CameraEditorStage.hx
+
+Nhưng:
+
+- Không tạo quá nhiều class không cần thiết.
+- Không duplicate logic của "ChartingState".
+- Tái sử dụng code/UI hiện có của Psych Engine.
+- Nếu một class hiện tại đã có chức năng tương ứng thì dùng lại.
+- Không sửa các hệ thống gameplay chỉ để phục vụ editor nếu có thể tránh.
+
+---
+
+4. Stage Preview
+
+Camera Editor phải có Stage Preview ở trung tâm.
+
+Stage Preview phải load stage và character của chart hiện tại bằng hệ thống hiện có của Psych Engine.
+
+Preview cần cho phép:
+
+Mouse
+
+- Middle Mouse Button:
+  - pan Stage Preview
+- Mouse Wheel:
+  - zoom Stage Preview
+
+Timeline scrubbing
+
+Khi người dùng kéo playhead:
+
+Timeline time changes
+        ↓
+song/chart time changes
+        ↓
+characters update
+        ↓
+animations update
+        ↓
+camera events được evaluate
+        ↓
+Virtual Camera update
+
+Preview phải có khả năng scrub tới trước/sau mà không cần restart toàn bộ editor.
+
+Nếu hệ thống animation hiện tại không hỗ trợ reverse playback trực tiếp, hãy implement cơ chế seek/rebuild state phù hợp thay vì giả vờ rằng animation đang chạy ngược.
+
+---
+
+5. Virtual Camera
+
+Trong Stage Preview phải có một rectangle biểu diễn vùng camera thực tế.
+
+Virtual Camera phải phản ánh:
+
+- camera X
+- camera Y
+- camera zoom
+- camera dimensions/aspect ratio
+
+Khi Timeline đang chạy:
+
+Camera Event
+    ↓
+Virtual Camera position/zoom
+
+Khi người dùng sửa Properties:
+
+Properties changed
+    ↓
+event data changed
+    ↓
+Virtual Camera update ngay lập tức
+
+Không yêu cầu phải playtest để nhìn thấy kết quả.
+
+---
+
+6. Relative View
+
+Thêm option:
+
+[ ] Relative View
+
+Khi bật:
+
+- Virtual Camera được giữ cố định trong Stage Preview.
+- Stage/characters di chuyển phía sau camera.
+- Mục đích là cho phép nhìn trực tiếp giống góc nhìn gameplay.
+
+Khi tắt:
+
+- Virtual Camera di chuyển theo camera events.
+
+---
+
+7. Extended Bounds
+
+Thêm option:
+
+[ ] Show Extended Bounds
+
+Khi bật:
+
+- hiển thị vùng camera mở rộng theo aspect ratio khoảng 20:9.
+- mục đích là preview vùng nhìn trên màn hình ultrawide/mobile.
+
+Không làm thay đổi camera gameplay thực tế.
+
+---
+
+8. Passepartout
+
+Thêm:
+
+[ ] Passepartout
+Opacity: [---------]
+
+Khi bật:
+
+- vùng nằm ngoài Virtual Camera được phủ màu tối.
+- vùng bên trong camera vẫn nhìn rõ.
+
+Opacity phải chỉnh được.
+
+Không được ảnh hưởng tới Stage Preview logic hoặc gameplay.
+
+---
+
+9. Timeline
+
+Đây là phần quan trọng nhất.
+
+Timeline phải nằm ở phía dưới.
+
+Timeline cần hỗ trợ:
+
+Time ruler
+
+Hiển thị:
+
+- Section
+- Beat
+- Step
+- timestamp nếu hữu ích
+
+Ví dụ:
+
+Section 12
+|----|----|----|----|
+0    1    2    3    4
+
+Timeline phải đồng bộ với BPM/chart timing hiện tại.
+
+---
+
+10. Playhead
+
+Có playhead rõ ràng.
+
+Cho phép:
+
+- click timeline để seek
+- drag playhead
+- keyboard navigation nếu phù hợp
+- playback
+
+Ví dụ:
+
+-------------------|-------------------
+                   ^
+                playhead
+
+---
+
+11. Camera Events
+
+Phiên bản đầu tiên bắt buộc hỗ trợ ít nhất:
+
+Focus Camera
+
+Tương ứng với hệ thống camera focus/follow hiện có của Psych Engine.
+
+Có thể biểu diễn:
+
+Focus Camera
+Position X
+Position Y
+Duration
+
+Nếu engine hiện tại dùng event value khác, phải map vào format hiện tại.
+
+Zoom Camera
+
+Hỗ trợ:
+
+Zoom Camera
+Zoom
+Duration
+
+Phải kiểm tra cách Psych Engine hiện tại xử lý camera zoom trước khi implement.
+
+Không hard-code một hệ thống camera mới nếu engine đã có camera logic.
+
+---
+
+12. Right click để tạo event
+
+Right-click vào Timeline:
+
+Add Event
+    ├── Focus Camera
+    └── Zoom Camera
+
+Event mới được tạo tại đúng thời gian click.
+
+Nếu click nằm trên một layer cụ thể thì event được tạo trên layer đó.
+
+---
+
+13. Event blocks
+
+Mỗi event phải hiển thị thành block trên Timeline.
+
+Ví dụ:
+
+Default
+|---- Focus Camera --------|
+
+Layer 2
+|------ Zoom Camera ----------------|
+
+Layer 3
+|-- Focus --|
+
+Block phải hiển thị:
+
+- event name/type
+- start time
+- duration
+- selected state
+
+---
+
+14. Resize Event Duration
+
+Có thể kéo cạnh trái/phải event:
+
+|====================|
+^                    ^
+resize               resize
+
+Khi kéo:
+
+- start time thay đổi nếu kéo cạnh trái
+- duration/end time thay đổi nếu kéo cạnh phải
+
+Phải có minimum duration hợp lý.
+
+---
+
+15. Snap
+
+Thêm:
+
+[✓] Snap
+
+Khi Snap bật:
+
+- event position snap theo Step.
+- event duration snap theo Step.
+
+Khi Snap tắt:
+
+- cho phép chỉnh thời gian tự do.
+
+Không làm mất độ chính xác của dữ liệu.
+
+---
+
+16. Timeline Zoom
+
+Timeline cần zoom.
+
+Có:
+
+Timeline Zoom
+[---------O------]
+
+Hoặc control tương đương.
+
+Ngoài ra:
+
+Shift + Mouse Wheel
+
+có thể zoom timeline.
+
+Zoom phải thay đổi số lượng thời gian nhìn thấy mà không thay đổi chart timing.
+
+---
+
+17. Timeline Layers
+
+Timeline phải hỗ trợ nhiều layer.
+
+Mặc định:
+
+Default
+
+Có nút:
+
++
+
+để thêm layer.
+
+Ví dụ:
+
+Default
+Camera
+Effects
+Zooms
+Custom
+
+Mỗi layer có thể chứa nhiều camera events.
+
+Layer chỉ là tổ chức/editor metadata; không được làm thay đổi thứ tự thực thi event nếu engine hiện tại không hỗ trợ layer execution.
+
+Nếu layer cần được lưu vào chart, hãy thiết kế backward-compatible metadata.
+
+---
+
+18. Layer navigation
+
+Nếu có nhiều layer:
+
+- Ctrl + Mouse Wheel: scroll giữa các layer
+- Middle Mouse: pan timeline/layer area nếu phù hợp
+
+Đừng làm input conflict với Stage Preview.
+
+---
+
+19. Multi-selection
+
+Cho phép:
+
+Click + Drag
+
+trên vùng Timeline để chọn nhiều event.
+
+Các event được chọn phải có visual feedback.
+
+Sau đó có thể:
+
+- move
+- copy
+- paste
+- delete
+
+---
+
+20. Copy / Paste
+
+Hỗ trợ:
+
+Ctrl + C
+Ctrl + V
+
+Khi nhiều event được chọn:
+
+- copy toàn bộ
+- giữ khoảng cách tương đối giữa chúng
+- paste tại vị trí hợp lý dựa trên playhead/selection
+
+Không làm thay đổi dữ liệu gốc.
+
+---
+
+21. Delete
+
+Hỗ trợ:
+
+Delete
+Backspace
+
+để xóa selected events.
+
+Phải có undo.
+
+---
+
+22. Undo / Redo
+
+Bắt buộc:
+
+Ctrl + Z
+Ctrl + Y
+
+Undo/Redo phải hỗ trợ ít nhất:
+
+- add event
+- delete event
+- move event
+- resize event
+- edit property
+- multi-select move
+- paste
+- layer creation/deletion nếu có
+
+Không sử dụng một undo system hoàn toàn độc lập nếu "ChartingState" đã có hệ thống phù hợp có thể tái sử dụng.
+
+---
+
+23. Properties Panel
+
+Khi click một event:
+
+Properties
+-----------------
+Type: Zoom Camera
+
+Position
+X: [ 123.0 ]
+Y: [ 456.0 ]
+
+Zoom
+[----O------]
+
+Duration
+[ 0.250 ]
+
+Start Time
+[ 12.500 ]
+
+Properties phải thay đổi realtime.
+
+Numeric fields:
+
+- Mouse Wheel tăng/giảm giá trị.
+- Giữ Shift có thể dùng bước nhỏ hơn nếu phù hợp.
+- Giữ Ctrl có thể dùng bước lớn hơn nếu phù hợp.
+
+Zoom nên có slider.
+
+---
+
+24. Realtime Virtual Camera
+
+Đây là yêu cầu quan trọng:
+
+Khi người dùng thay đổi:
+
+Position X
+Position Y
+Zoom
+Duration
+
+Virtual Camera phải update ngay.
+
+Không yêu cầu:
+
+Save → Exit → Playtest
+
+mới thấy kết quả.
+
+---
+
+25. Playback
+
+Camera Editor cần có playback.
+
+Khi Play:
+
+- song time chạy
+- Stage Preview update
+- character animations update
+- camera events được evaluate
+- Virtual Camera di chuyển/zoom
+
+Khi Pause:
+
+- giữ nguyên state
+
+Khi scrub:
+
+- seek chính xác tới thời điểm mới.
+
+Không tạo một gameplay instance hoàn chỉnh nếu "EditorPlayState" hiện tại có thể tái sử dụng.
+
+---
+
+26. Chart loading
+
+Camera Editor phải có cách load chart hiện tại.
+
+Ưu tiên:
+
+- nhận "Song.SwagSong"
+- hoặc dữ liệu chart mà "ChartingState" hiện tại đang dùng.
+
+Nếu mở Camera Editor từ Chart Editor:
+
+ChartingState
+    ↓
+Camera Editor
+
+phải giữ chart data hiện tại.
+
+Không bắt người dùng export/import thủ công chỉ để mở Camera Editor.
+
+---
+
+27. Save
+
+Camera Editor phải lưu camera event changes về format chart hiện tại của Psych Engine.
+
+Không được tạo format ".fnfc" mới.
+
+Nếu chart hiện tại sử dụng:
+
+"events": [...]
+
+thì hãy dùng hệ thống đó.
+
+Nếu cần layer metadata, hãy thêm field theo cách không phá chart cũ.
+
+Ví dụ concept:
+
+{
+    "time": 12500,
+    "type": "event",
+    "name": "Focus Camera",
+    "value": {
+        "x": 100,
+        "y": 50,
+        "duration": 250
+    },
+    "layer": "Camera"
+}
+
+NHƯNG:
+
+Không dùng ví dụ trên một cách máy móc.
+
+Hãy đọc format event thực tế của repository trước và giữ nguyên schema hiện tại nếu có thể.
+
+---
+
+28. Compatibility
+
+Camera Editor phải hoạt động với chart cũ.
+
+Nếu chart không có layer:
+
+Default
+
+Nếu chart không có duration:
+
+duration = 0
+
+Nếu event không phải camera event:
+
+- không được crash.
+- có thể bỏ qua hoặc hiển thị read-only nếu cần.
+
+---
+
+29. Master Editor Menu
+
+Thêm entry:
+
+Camera Editor
+
+vào "MasterEditorMenu".
+
+Không phá các editor hiện tại.
+
+Nếu Camera Editor cần chart để mở:
+
+- cho phép chọn chart/song theo hệ thống editor hiện tại.
+- hoặc mở từ Chart Editor bằng một button/menu action.
+
+---
+
+30. Không phá ChartingState
+
+Đây là yêu cầu rất quan trọng.
+
+Không rewrite toàn bộ:
+
+ChartingState.hx
+
+chỉ để thêm Camera Editor.
+
+Camera Editor phải là editor chuyên biệt.
+
+ChartingState vẫn phải:
+
+- mở được
+- edit notes được
+- edit events hiện tại được
+- save chart được
+
+Camera Editor chỉ cung cấp workflow tốt hơn cho camera events.
+
+---
+
+31. UI / Style
+
+Sử dụng UI style hiện tại của PsychEngine-Custom.
+
+Không copy asset proprietary từ V-Slice.
+
+Không phụ thuộc asset từ FNF V-Slice.
+
+Có thể lấy ý tưởng layout/UX từ Camera Editor chính thức nhưng implementation phải native với Psych Engine-Custom.
+
+---
+
+32. Performance
+
+Camera Editor phải chịu được chart có rất nhiều events.
+
+Bài viết Camera Editor của FNF dùng ví dụ chart có tới 468 events.
+
+Vì vậy:
+
+- Không tạo hàng nghìn object mỗi frame.
+- Không redraw toàn bộ Timeline mỗi frame nếu không cần.
+- Chỉ update visible timeline elements khi có thể.
+- Cache text/UI khi hợp lý.
+- Không chạy full gameplay logic nhiều lần mỗi frame.
+
+---
+
+33. Input conflicts
+
+Phải xử lý rõ:
+
+Stage Preview:
+
+Middle Mouse = Pan
+Wheel = Zoom
+
+Timeline:
+
+Left Click = Select/Scrub
+Right Click = Add Event
+Wheel = Scroll
+Shift + Wheel = Timeline Zoom
+Ctrl + Wheel = Layer navigation
+
+Properties:
+
+Wheel over numeric field = Adjust value
+
+Không để input của Timeline tác động Stage Preview cùng lúc.
+
+---
+
+34. Mobile compatibility
+
+Repository này là custom mobile fork.
+
+Do đó:
+
+- Desktop mouse controls là bắt buộc.
+- Nhưng UI không được cố định theo desktop-only assumptions.
+- Không được crash khi không có mouse.
+- Các phần UI chính phải có kích thước hợp lý trên màn hình nhỏ.
+
+Không cần tạo touch editor hoàn chỉnh nếu nó làm scope quá lớn, nhưng architecture không được khóa cứng vào mouse.
+
+---
+
+35. Haxe / Flixel compatibility
+
+Trước khi dùng API nào:
+
+- kiểm tra version/library hiện tại trong repo.
+- kiểm tra class/API thực sự tồn tại.
+- không giả định API của Flixel mới hơn.
+
+Đặc biệt không tự ý thay haxelib hiện tại.
+
+Tuân thủ "AGENTS.md".
+
+Không đổi:
+
+- Lime
+- Flixel
+- OpenFL
+- hxcpp
+- hscript
+- các fork/version hiện tại
+
+chỉ để phục vụ Camera Editor.
+
+---
+
+36. Code quality
+
+Code phải:
+
+- Haxe hợp lệ.
+- Null-safe ở những chỗ cần thiết.
+- Không để TODO giả làm feature hoàn chỉnh.
+- Không tạo placeholder UI nếu feature đó được yêu cầu.
+- Không copy nguyên code V-Slice mà không hiểu API.
+- Tách logic Timeline / Event / Preview hợp lý.
+
+Nếu một API hoặc hệ thống hiện tại chưa rõ:
+
+đọc source trước, không đoán.
+
+---
+
+37. Build / verification
+
+Theo "AGENTS.md":
+
+Không build local.
+
+Repository này build Android thông qua GitHub Actions.
+
+Sau khi implementation hoàn tất:
+
+1. Kiểm tra toàn bộ Haxe syntax/import/type references bằng cách đọc source và kiểm tra consistency.
+2. Kiểm tra tất cả references tới class/function mới.
+3. Kiểm tra save/load format.
+4. Kiểm tra không có import tới class không tồn tại.
+5. Kiểm tra không có API Flixel/OpenFL không tồn tại trong version hiện tại.
+6. Nếu có quyền GitHub Actions, push thay đổi để CI build.
+7. Nếu CI fail, đọc log và sửa lỗi thực tế.
+
+Không tạo commit chỉ để trigger build.
+
+---
+
+38. Acceptance criteria
+
+Feature chỉ được coi là hoàn thành khi:
+
+- [ ] Có Camera Editor State riêng.
+- [ ] Có Stage Preview.
+- [ ] Stage Preview load được chart/stage/characters.
+- [ ] Có Timeline.
+- [ ] Có playhead.
+- [ ] Có Section/Beat/Step markers.
+- [ ] Có Focus Camera event.
+- [ ] Có Zoom Camera event.
+- [ ] Right-click tạo event.
+- [ ] Event có thể select.
+- [ ] Event có thể move.
+- [ ] Event có thể resize duration.
+- [ ] Có Snap.
+- [ ] Có Timeline Zoom.
+- [ ] Có nhiều Timeline Layers.
+- [ ] Có multi-select.
+- [ ] Có Copy/Paste.
+- [ ] Có Delete.
+- [ ] Có Undo/Redo.
+- [ ] Có Properties Panel.
+- [ ] Properties chỉnh realtime.
+- [ ] Numeric values hỗ trợ Mouse Wheel.
+- [ ] Zoom có slider.
+- [ ] Có Virtual Camera.
+- [ ] Virtual Camera phản ánh camera events.
+- [ ] Virtual Camera update realtime khi chỉnh property.
+- [ ] Có Relative View.
+- [ ] Có Show Extended Bounds.
+- [ ] Có Passepartout + opacity.
+- [ ] Có playback.
+- [ ] Có timeline scrubbing.
+- [ ] Chart cũ không có camera metadata vẫn mở được.
+- [ ] Save không phá format chart hiện tại.
+- [ ] Camera Editor mở được từ Master Editor Menu hoặc Chart Editor.
+- [ ] ChartingState hiện tại vẫn hoạt động bình thường.
+- [ ] Không thêm dependency ngoài cần thiết.
+- [ ] Không dùng asset V-Slice proprietary.
+- [ ] Không phá Android build architecture.
+
+---
+
+39. Quan trọng: cách thực hiện
+
+Đừng chỉ đưa ra hướng dẫn hoặc pseudo-code.
+
+Hãy thực hiện implementation trực tiếp trong repository.
+
+Trước mỗi thay đổi lớn:
+
+- đọc source liên quan
+- xác định API thực tế
+- reuse code hiện có
+
+Sau đó implement từng phần.
+
+Không rewrite hàng loạt file không liên quan.
+
+Ưu tiên thay đổi tối thiểu nhưng feature hoàn chỉnh.
+
+Nếu phát hiện một phần của yêu cầu Camera Editor không thể map 1:1 vào Psych Engine hiện tại, hãy dùng implementation tương đương phù hợp với engine thay vì ép kiến trúc V-Slice vào Psych Engine.
+
+Mục tiêu cuối cùng:
+
+PsychEngine-Custom có một Camera Editor chuyên dụng, UX lấy cảm hứng từ Camera Editor FNF 2026, nhưng dữ liệu, camera system, chart format, UI framework và architecture vẫn native với Psych Engine-Custom.

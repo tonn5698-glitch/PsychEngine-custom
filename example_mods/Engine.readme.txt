@@ -1,0 +1,26 @@
+ENGINE.json (CẤU HÌNH MOD)
+
+Copy file Engine.json này vào thư mục mod của bạn:
+    <MyMod>/data/Engine.json
+
+VIDEO INTRO TÙY BIẾN (Enable Custom Intro Video trong Experiment):
+    - "video": "intro.mp4"
+    - Đặt video thật tại: <MyMod>/videos/intro.mp4
+    - Có thể là đường dẫn tương đối khác trong mod (VD "cutscene/intro.webm")
+    - Video mp4/webm/mkv đều được (hxvlc hỗ trợ)
+
+BOP (Funky Mode — Experiment > Enable Funky Mode):
+    - "bop-bpm": 130
+        BPM dùng làm nhịp bop cho HUD. VD 130 = bop nhanh hơn, 90 = chậm hơn.
+        Nếu không khai báo → mặc định 102.
+    - "bop-style": "Cube Out"
+        Ease tween khi bop. Nhận diện được nhiều format:
+          "Cube Out", "cubeout", "cubeOut", "cube_out", "backout", "linear", ...
+        Nếu không khai báo → mặc định "Cube Out".
+
+GHI CHÚ:
+    - Chỉ MOD đầu tiên có data/Engine.json được dùng (mod enabled ưu tiên).
+    - JSON phải hợp lệ (KHÔNG chứa comment // hoặc /* */).
+    - bop-bpm/bop-style mặc định chỉ áp dụng khi user CHƯA tự set qua Experiment
+      (lựa chọn trong Experiment > Bop Style / Bop BPM được lưu và giữ ưu tiên).
+    - Bật tính năng: Options > Experiment > Enable Custom Intro Video / Enable Funky Mode
