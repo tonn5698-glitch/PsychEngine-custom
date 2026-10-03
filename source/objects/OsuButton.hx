@@ -46,8 +46,6 @@ class OsuButton extends FlxSpriteGroup
 		return v;
 	}
 
-	public inline function hovered():Bool
-		return FlxG.mouse.overlaps(bg);
 
 	override function update(elapsed:Float)
 	{
