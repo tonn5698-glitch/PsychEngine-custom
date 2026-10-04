@@ -110,6 +110,14 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-android-
 
+      - name: Report the compiler that will be used
+        if: inputs.name == 'Android'
+        run: |
+          echo "PATH head: $(echo "$PATH" | cut -d: -f1-3)"
+          echo "which clang++: $(command -v clang++)"
+          clang++ --version || true
+          ls -1 "$(dirname "$(command -v clang++)")" | grep -iE '^ld|lld' || true
+
       - name: Compile
         run: haxelib run lime build ${{ inputs.buildArgs }}
 
