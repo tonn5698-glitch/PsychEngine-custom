@@ -19,14 +19,20 @@ echo This might take a few moments depending on your internet speed.
 haxelib_has() {
 	haxelib_name=$1
 	haxelib_want=$2
-	[ -d "$HAXELIB_PATH/$haxelib_name" ] || return 1
-	if [ -z "$haxelib_want" ]; then
-		for haxelib_dir in "$HAXELIB_PATH/$haxelib_name"/*/; do
-			[ -d "$haxelib_dir" ] && return 0
-		done
-		return 1
+	if [ -d "$HAXELIB_PATH/$haxelib_name" ]; then
+		if [ -z "$haxelib_want" ]; then
+			for haxelib_dir in "$HAXELIB_PATH/$haxelib_name"/*/; do
+				[ -d "$haxelib_dir" ] && return 0
+			done
+		elif [ -d "$HAXELIB_PATH/$haxelib_name/$haxelib_want" ]; then
+			return 0
+		fi
 	fi
-	[ -d "$HAXELIB_PATH/$haxelib_name/$haxelib_want" ]
+	[ -z "$haxelib_want" ] && return 1
+	# Not in ~/.haxelib, but Haxe ships its own copy of some libraries
+	# (flixel-addons, tink_core, ...) in its bundled lib directory, and those
+	# are perfectly usable. `haxelib path` resolves across every repository.
+	haxelib path "$haxelib_name" "$haxelib_want" >/dev/null 2>&1
 }
 
 install_haxelib() {
