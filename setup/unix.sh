@@ -66,8 +66,12 @@ install_haxelib() {
 		return 0
 	fi
 	echo "ERROR: '$name' could not be installed and no usable local copy was found." >&2
-	echo "Currently installed haxelibs:" >&2
-	haxelib list >&2 || true
+	# `haxelib list` is useless here - it needs the index too. Show the real tree.
+	for haxelib_root in "$HAXELIB_PATH" "$HAXELIB_BUNDLED"; do
+		[ -n "$haxelib_root" ] || continue
+		echo "--- $haxelib_root" >&2
+		ls -1 "$haxelib_root" >&2 2>/dev/null || echo "(missing)" >&2
+	done
 	return 1
 }
 
