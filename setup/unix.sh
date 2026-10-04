@@ -10,26 +10,44 @@ haxelib setup ~/haxelib
 echo Installing dependencies...
 echo This might take a few moments depending on your internet speed.
 
+# True when $name is installed locally at $2 (any version if $2 is empty).
+# Dots are escaped so a version like 9.4.1 cannot match 9x4y1.
+haxelib_has() {
+	haxelib_name=$1
+	haxelib_want=$2
+	if [ -z "$haxelib_want" ]; then
+		haxelib list | grep -q "^$(printf '%s' "$haxelib_name" | sed 's/\./\\./g'):"
+		return
+	fi
+	haxelib_want_esc=$(printf '%s' "$haxelib_want" | sed 's/\./\\./g')
+	haxelib list | grep -Eq "^$(printf '%s' "$haxelib_name" | sed 's/\./\\./g'): ?$haxelib_want_esc([[:space:]]|$)"
+}
+
 install_haxelib() {
 	name=$1
 	shift
+	want=""
 	if [ "$1" = "install" ] && [ $# -ge 3 ]; then
 		case $3 in
-			""|-*)
-				if haxelib list | grep -q "^$name:"; then
-					return 0
-				fi
-				;;
-			*)
-				if haxelib list | grep -Eq "^$name: ?$3([[:space:]]|$)"; then
-					return 0
-				fi
-				;;
+			""|-*) want="" ;;
+			*) want=$3 ;;
 		esac
-	elif haxelib list | grep -q "^$name:"; then
+	fi
+	if haxelib_has "$name" "$want"; then
 		return 0
 	fi
-	haxelib "$@"
+	# haxelib resolves the package list through lib.haxe.org, which is backed by
+	# a MySQL server. When that database is unreachable every install fails even
+	# though the ~/.haxelib cache restored fine and the library is already there.
+	# Only tolerate the failure if the exact library really is present locally;
+	# a genuinely missing library must still fail the build.
+	if haxelib "$@" || haxelib_has "$name" "$want"; then
+		return 0
+	fi
+	echo "ERROR: '$name' could not be installed and no usable local copy was found." >&2
+	echo "Currently installed haxelibs:" >&2
+	haxelib list >&2 || true
+	return 1
 }
 
 haxelib git hxcpp https://github.com/kittycathy233/hxcpp --quiet
