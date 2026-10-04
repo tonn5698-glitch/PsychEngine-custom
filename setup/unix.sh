@@ -140,5 +140,5 @@ install_haxelib hxdiscord_rpc install hxdiscord_rpc --quiet --skip-dependencies
 install_haxelib hxvlc install hxvlc 2.0.1 --quiet --skip-dependencies
 install_haxelib hxcpp-debug-server install hxcpp-debug-server --quiet
 haxelib git funkin.vis https://github.com/FunkinCrew/funkVis 22b1ce089dd924f15cdc4632397ef3504d464e90 --quiet --skip-dependencies
-haxelib git grig.audio https://gitlab.com/haxe-grig/grig.audio.git cbf91e2180fd2e374924fe74844086aab7891666 --quiet
+haxelib git grig.audio https://gitlab.com/haxe-grig/grig.audio.git cbf91e2180fd2e374924fe74844086aab7891666 --quiet --skip-dependencies
 echo Finished!
