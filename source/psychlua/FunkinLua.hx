@@ -1056,16 +1056,12 @@ class FunkinLua {
 			if(stretch)
 			{
 				leVideo.bitmap.onFormatSetup.add(function() {
-					#if hxvlc
-					var wd:Int = leVideo.bitmap.formatWidth;
-					var hg:Int = leVideo.bitmap.formatHeight;
-					if(wd > 0 && hg > 0)
-					{
-						leVideo.setGraphicSize(FlxG.width / wd, FlxG.height / hg);
-						leVideo.updateHitbox();
-						leVideo.screenCenter();
-					}
-					#end
+					// hxvlc 2.0.1's Video has no formatWidth/formatHeight (see the
+					// commented-out block in objects/VideoSprite.hx), so stretch the
+					// same way the engine's own VideoSprite does.
+					leVideo.setGraphicSize(FlxG.width);
+					leVideo.updateHitbox();
+					leVideo.screenCenter();
 				});
 			}
 			leVideo.load(Paths.video(video), shouldLoop ? ['input-repeat=65545'] : null);
@@ -1082,16 +1078,16 @@ class FunkinLua {
 			var v = getLuaVideoSprite(tag);
 			if(v != null) v.resume();
 		});
-		// Restarts playback from the beginning.
+		// Restarts playback from the beginning. bitmap.time is Int64.
 		Lua_helper.add_callback(lua, "rewindLuaVideo", function(tag:String) {
 			var v = getLuaVideoSprite(tag);
-			if(v != null && v.bitmap != null) v.bitmap.time = 0;
+			if(v != null && v.bitmap != null) v.bitmap.time = Int64.ofInt(0);
 		});
-		// -1 when the video is finished / unavailable.
+		// Playback position in milliseconds, or -1 when unavailable.
 		Lua_helper.add_callback(lua, "getLuaVideoTime", function(tag:String) {
 			var v = getLuaVideoSprite(tag);
 			if(v == null || v.bitmap == null) return -1;
-			return v.bitmap.time;
+			return v.bitmap.time.toInt();
 		});
 		#end
 		Lua_helper.add_callback(lua, "makeAnimatedLuaSprite", function(tag:String, ?image:String = null, ?x:Float = 0, ?y:Float = 0, ?spriteType:String = 'auto') {
