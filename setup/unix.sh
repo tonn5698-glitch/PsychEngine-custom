@@ -13,7 +13,16 @@ HAXELIB_PATH="$HOME/haxelib"
 # exactly what is unavailable, so the filesystem is the only reliable source.
 HAXE_BIN=$(command -v haxe 2>/dev/null || true)
 if [ -n "$HAXE_BIN" ]; then
-	HAXELIB_BUNDLED="$(dirname "$HAXE_BIN")/../lib"
+	# Haxe's own haxelib repository sits next to the haxe binary. Some toolchain
+	# layouts put haxe in <root>/bin/haxe (repo at <root>/lib), others at
+	# <root>/haxe (repo at <root>/lib too) - probe both rather than assume.
+	HAXELIB_BUNDLED=""
+	for haxelib_guess in "$(dirname "$HAXE_BIN")/../lib" "$(dirname "$HAXE_BIN")/lib"; do
+		if [ -d "$haxelib_guess" ]; then
+			HAXELIB_BUNDLED="$haxelib_guess"
+			break
+		fi
+	done
 else
 	HAXELIB_BUNDLED=""
 fi
@@ -66,11 +75,15 @@ install_haxelib() {
 		return 0
 	fi
 	echo "ERROR: '$name' could not be installed and no usable local copy was found." >&2
-	# `haxelib list` is useless here - it needs the index too. Show the real tree.
+	# `haxelib list` is useless here - it needs the index too. Show what is on disk.
 	for haxelib_root in "$HAXELIB_PATH" "$HAXELIB_BUNDLED"; do
 		[ -n "$haxelib_root" ] || continue
-		echo "--- $haxelib_root" >&2
-		ls -1 "$haxelib_root" >&2 2>/dev/null || echo "(missing)" >&2
+		if [ -d "$haxelib_root/$name" ]; then
+			echo "--- $haxelib_root/$name has versions:" >&2
+			ls -1 "$haxelib_root/$name" >&2
+		else
+			echo "--- $haxelib_root has no '$name'" >&2
+		fi
 	done
 	return 1
 }
