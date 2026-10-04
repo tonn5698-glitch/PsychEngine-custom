@@ -6,6 +6,17 @@ set -eu
 cd ..
 echo Setting up haxelib...
 HAXELIB_PATH="$HOME/haxelib"
+# Haxe ships its own copy of some libraries (flixel-addons, tink_core, ...) in a
+# bundled repository next to the haxe binary. Both repositories are usable, so
+# a library counts as installed if it is in either. `haxelib list` sees them
+# both, but `haxelib list`/`haxelib path` go through the package index, which is
+# exactly what is unavailable, so the filesystem is the only reliable source.
+HAXE_BIN=$(command -v haxe 2>/dev/null || true)
+if [ -n "$HAXE_BIN" ]; then
+	HAXELIB_BUNDLED="$(dirname "$HAXE_BIN")/../lib"
+else
+	HAXELIB_BUNDLED=""
+fi
 mkdir -p "$HAXELIB_PATH"
 haxelib setup "$HAXELIB_PATH"
 echo Installing dependencies...
@@ -19,20 +30,18 @@ echo This might take a few moments depending on your internet speed.
 haxelib_has() {
 	haxelib_name=$1
 	haxelib_want=$2
-	if [ -d "$HAXELIB_PATH/$haxelib_name" ]; then
+	for haxelib_root in "$HAXELIB_PATH" "$HAXELIB_BUNDLED"; do
+		[ -n "$haxelib_root" ] || continue
+		[ -d "$haxelib_root/$haxelib_name" ] || continue
 		if [ -z "$haxelib_want" ]; then
-			for haxelib_dir in "$HAXELIB_PATH/$haxelib_name"/*/; do
+			for haxelib_dir in "$haxelib_root/$haxelib_name"/*/; do
 				[ -d "$haxelib_dir" ] && return 0
 			done
-		elif [ -d "$HAXELIB_PATH/$haxelib_name/$haxelib_want" ]; then
+		elif [ -d "$haxelib_root/$haxelib_name/$haxelib_want" ]; then
 			return 0
 		fi
-	fi
-	[ -z "$haxelib_want" ] && return 1
-	# Not in ~/.haxelib, but Haxe ships its own copy of some libraries
-	# (flixel-addons, tink_core, ...) in its bundled lib directory, and those
-	# are perfectly usable. `haxelib path` resolves across every repository.
-	haxelib path "$haxelib_name" "$haxelib_want" >/dev/null 2>&1
+	done
+	return 1
 }
 
 install_haxelib() {
