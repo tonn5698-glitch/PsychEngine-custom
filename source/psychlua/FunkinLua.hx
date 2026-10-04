@@ -1078,17 +1078,6 @@ class FunkinLua {
 			var v = getLuaVideoSprite(tag);
 			if(v != null) v.resume();
 		});
-		// Restarts playback from the beginning. bitmap.time is Int64.
-		Lua_helper.add_callback(lua, "rewindLuaVideo", function(tag:String) {
-			var v = getLuaVideoSprite(tag);
-			if(v != null && v.bitmap != null) v.bitmap.time = Int64.ofInt(0);
-		});
-		// Playback position in milliseconds, or -1 when unavailable.
-		Lua_helper.add_callback(lua, "getLuaVideoTime", function(tag:String) {
-			var v = getLuaVideoSprite(tag);
-			if(v == null || v.bitmap == null) return -1;
-			return v.bitmap.time.toInt();
-		});
 		#end
 		Lua_helper.add_callback(lua, "makeAnimatedLuaSprite", function(tag:String, ?image:String = null, ?x:Float = 0, ?y:Float = 0, ?spriteType:String = 'auto') {
 			tag = tag.replace('.', '');
