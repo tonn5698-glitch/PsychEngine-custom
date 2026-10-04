@@ -5,22 +5,28 @@
 set -eu
 cd ..
 echo Setting up haxelib...
-mkdir -p ~/haxelib
-haxelib setup ~/haxelib
+HAXELIB_PATH="$HOME/haxelib"
+mkdir -p "$HAXELIB_PATH"
+haxelib setup "$HAXELIB_PATH"
 echo Installing dependencies...
 echo This might take a few moments depending on your internet speed.
 
 # True when $name is installed locally at $2 (any version if $2 is empty).
-# Dots are escaped so a version like 9.4.1 cannot match 9x4y1.
+# The layout is $HAXELIB_PATH/<name>/<version>, so this is checked on disk
+# rather than with `haxelib list` - that command needs the package index too and
+# therefore prints nothing while lib.haxe.org is unreachable. Dots are escaped so
+# a version like 9.4.1 cannot match 9x4y1.
 haxelib_has() {
 	haxelib_name=$1
 	haxelib_want=$2
+	[ -d "$HAXELIB_PATH/$haxelib_name" ] || return 1
 	if [ -z "$haxelib_want" ]; then
-		haxelib list | grep -q "^$(printf '%s' "$haxelib_name" | sed 's/\./\\./g'):"
-		return
+		for haxelib_dir in "$HAXELIB_PATH/$haxelib_name"/*/; do
+			[ -d "$haxelib_dir" ] && return 0
+		done
+		return 1
 	fi
-	haxelib_want_esc=$(printf '%s' "$haxelib_want" | sed 's/\./\\./g')
-	haxelib list | grep -Eq "^$(printf '%s' "$haxelib_name" | sed 's/\./\\./g'): ?$haxelib_want_esc([[:space:]]|$)"
+	[ -d "$HAXELIB_PATH/$haxelib_name/$haxelib_want" ]
 }
 
 install_haxelib() {
