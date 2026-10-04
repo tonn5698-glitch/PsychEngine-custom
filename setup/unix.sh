@@ -39,16 +39,27 @@ echo This might take a few moments depending on your internet speed.
 haxelib_has() {
 	haxelib_name=$1
 	haxelib_want=$2
+	# haxelib replaces every dot with a comma when it lays out the repository on
+	# disk, so flixel-addons 3.2.2 lives in flixel-addons/3,2,2 and funkin.vis in
+	# funkin,vis. Check the sanitised form first, then the literal one.
+	haxelib_name_dir=$(printf '%s' "$haxelib_name" | tr '.' ',')
+	haxelib_want_dir=""
+	if [ -n "$haxelib_want" ]; then
+		haxelib_want_dir=$(printf '%s' "$haxelib_want" | tr '.' ',')
+	fi
 	for haxelib_root in "$HAXELIB_PATH" "$HAXELIB_BUNDLED"; do
-		[ -n "$haxelib_root" ] || continue
-		[ -d "$haxelib_root/$haxelib_name" ] || continue
-		if [ -z "$haxelib_want" ]; then
-			for haxelib_dir in "$haxelib_root/$haxelib_name"/*/; do
-				[ -d "$haxelib_dir" ] && return 0
-			done
-		elif [ -d "$haxelib_root/$haxelib_name/$haxelib_want" ]; then
-			return 0
-		fi
+		if [ -z "$haxelib_root" ]; then continue; fi
+		for haxelib_dir_name in "$haxelib_name_dir" "$haxelib_name"; do
+			if [ ! -d "$haxelib_root/$haxelib_dir_name" ]; then continue; fi
+			if [ -z "$haxelib_want" ]; then
+				for haxelib_dir in "$haxelib_root/$haxelib_dir_name"/*/; do
+					if [ -d "$haxelib_dir" ]; then return 0; fi
+				done
+			elif [ -d "$haxelib_root/$haxelib_dir_name/$haxelib_want_dir" ] \
+				|| [ -d "$haxelib_root/$haxelib_dir_name/$haxelib_want" ]; then
+				return 0
+			fi
+		done
 	done
 	return 1
 }
@@ -77,7 +88,7 @@ install_haxelib() {
 	echo "ERROR: '$name' could not be installed and no usable local copy was found." >&2
 	# `haxelib list` is useless here - it needs the index too. Show what is on disk.
 	for haxelib_root in "$HAXELIB_PATH" "$HAXELIB_BUNDLED"; do
-		[ -n "$haxelib_root" ] || continue
+		if [ -z "$haxelib_root" ]; then continue; fi
 		if [ -d "$haxelib_root/$name" ]; then
 			echo "--- $haxelib_root/$name has versions:" >&2
 			ls -1 "$haxelib_root/$name" >&2
