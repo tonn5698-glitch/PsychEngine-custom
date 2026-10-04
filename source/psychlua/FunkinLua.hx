@@ -22,6 +22,9 @@ import objects.StrumNote;
 import objects.Note;
 import objects.NoteSplash;
 import objects.Character;
+#if VIDEOS_ALLOWED
+import hxvlc.flixel.FlxVideoSprite;
+#end
 
 import states.MainMenuState;
 import states.StoryMenuState;
@@ -1038,6 +1041,59 @@ class FunkinLua {
 			MusicBeatState.getVariables().set(tag, leSprite);
 			leSprite.active = true;
 		});
+		#if VIDEOS_ALLOWED
+		// Mid-song video sprite for mods (e.g. the binary-rain layer in
+		// Vs. Dave & Bambi's "matrix" stage). objects.VideoSprite is built for
+		// cutscenes (skip pie + black cover), so this exposes the bare
+		// hxvlc sprite instead and lets Lua place/scale/tint it like any sprite.
+		Lua_helper.add_callback(lua, "makeLuaVideoSprite", function(tag:String, video:String, ?x:Float = 0, ?y:Float = 0, ?shouldLoop:Bool = true, ?stretch:Bool = true) {
+			tag = tag.replace('.', '');
+			LuaUtils.destroyObject(tag);
+			var leVideo:FlxVideoSprite = new FlxVideoSprite(x, y);
+			leVideo.scrollFactor.set();
+			leVideo.antialiasing = ClientPrefs.data.antialiasing;
+			MusicBeatState.getVariables().set(tag, leVideo);
+			if(stretch)
+			{
+				leVideo.bitmap.onFormatSetup.add(function() {
+					#if hxvlc
+					var wd:Int = leVideo.bitmap.formatWidth;
+					var hg:Int = leVideo.bitmap.formatHeight;
+					if(wd > 0 && hg > 0)
+					{
+						leVideo.setGraphicSize(FlxG.width / wd, FlxG.height / hg);
+						leVideo.updateHitbox();
+						leVideo.screenCenter();
+					}
+					#end
+				});
+			}
+			leVideo.load(Paths.video(video), shouldLoop ? ['input-repeat=65545'] : null);
+		});
+		Lua_helper.add_callback(lua, "playLuaVideo", function(tag:String) {
+			var v = getLuaVideoSprite(tag);
+			if(v != null) v.play();
+		});
+		Lua_helper.add_callback(lua, "pauseLuaVideo", function(tag:String) {
+			var v = getLuaVideoSprite(tag);
+			if(v != null) v.pause();
+		});
+		Lua_helper.add_callback(lua, "resumeLuaVideo", function(tag:String) {
+			var v = getLuaVideoSprite(tag);
+			if(v != null) v.resume();
+		});
+		// Restarts playback from the beginning.
+		Lua_helper.add_callback(lua, "rewindLuaVideo", function(tag:String) {
+			var v = getLuaVideoSprite(tag);
+			if(v != null && v.bitmap != null) v.bitmap.time = 0;
+		});
+		// -1 when the video is finished / unavailable.
+		Lua_helper.add_callback(lua, "getLuaVideoTime", function(tag:String) {
+			var v = getLuaVideoSprite(tag);
+			if(v == null || v.bitmap == null) return -1;
+			return v.bitmap.time;
+		});
+		#end
 		Lua_helper.add_callback(lua, "makeAnimatedLuaSprite", function(tag:String, ?image:String = null, ?x:Float = 0, ?y:Float = 0, ?spriteType:String = 'auto') {
 			tag = tag.replace('.', '');
 			LuaUtils.destroyObject(tag);
@@ -1835,6 +1891,18 @@ class FunkinLua {
 			PlayState.instance.addTextToDebug(text, color);
 		}
 	}
+
+	#if VIDEOS_ALLOWED
+	// Resolves a tag created by makeLuaVideoSprite, so the play/pause/stop
+	// callbacks above stay null-safe instead of trusting the mod's script.
+	static function getLuaVideoSprite(tag:String):FlxVideoSprite {
+		var obj:Dynamic = MusicBeatState.getVariables().get(tag);
+		if(obj == null) return null;
+		if(Std.isOfType(obj, FlxVideoSprite)) return cast obj;
+		luaTrace('Lua video API: "' + tag + '" is not a video sprite', false, false, FlxColor.RED);
+		return null;
+	}
+	#end
 
 	public static function getBool(variable:String) {
 		if(lastCalledScript == null) return false;

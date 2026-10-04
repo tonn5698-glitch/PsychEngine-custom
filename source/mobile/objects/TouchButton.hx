@@ -193,11 +193,6 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	 */
 	var currentInput:IFlxInput;
 
-	/**
-	 * Delay trước khi release khi di chuyển giữa các hitbox (frame counter).
-	 */
-	var releaseDelay:Int = 0;
-
 	public var canChangeLabelAlpha:Bool = true;
 
 	/**
@@ -303,34 +298,7 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 			onUpHandler();
 
 		if (status != TouchButton.NORMAL && (!overlapFound || (currentInput != null && currentInput.justReleased)))
-		{
-			// DELAY RELEASE: khi ngón tay rời hitbox nhưng vẫn pressed,
-			// chờ 1 frame xem có hitbox nào khác nhận được touch không
-			// → tránh cắt input khi di chuyển ← → ↓ →
-			if (!overlapFound && currentInput != null && !currentInput.justReleased)
-			{
-				// Ngón tay vẫn giữ, rời khỏi hitbox → chờ frame sau
-				if (releaseDelay <= 0)
-					releaseDelay = 1; // 1 frame
-				else
-				{
-					releaseDelay--;
-					if (releaseDelay <= 0)
-						onOutHandler();
-				}
-			}
-			else
-			{
-				// Touch đã release hoặc vẫn overlap → release ngay
-				releaseDelay = 0;
-				onOutHandler();
-			}
-		}
-		else if (status != TouchButton.NORMAL && overlapFound)
-		{
-			// Touch quay lại hitbox → hủy delay release
-			releaseDelay = 0;
-		}
+			onOutHandler();
 	}
 
 	function checkTouchOverlap():Bool
@@ -383,11 +351,7 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 		{
 			// Allow 'swiping' to press a button (dragging it over the button while pressed)
 			if (allowSwiping && input.pressed)
-			{
-				// Quan trọng: set currentInput khi swipe → giúp release đúng khi nhả ngón
-				currentInput = input;
 				onDownHandler();
-			}
 			else
 				onOverHandler();
 		}

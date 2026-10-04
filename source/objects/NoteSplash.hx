@@ -341,7 +341,9 @@ class NoteSplash extends FlxSprite
 		if (spawned)
 		{
 			aliveTime += elapsed;
-			if (animation.curAnim == null && aliveTime >= buggedKillTime)
+			// FlxAnimation keeps curAnim after it finishes. Check finished as well,
+			// so a splash can never remain stuck if the finish callback is skipped.
+			if (animation.curAnim == null || animation.curAnim.finished)
 			{
 				kill();
 				spawned = false;

@@ -56,6 +56,15 @@ jobs:
           add-to-path: false
           local-cache: true
 
+      # hxcpp shells out to clang++ for the final link and clang++ reaches for
+      # ld.lld, which recent macos-15 / Xcode images no longer ship. Without it
+      # the build dies at "Link: libApplicationMain-64.so" after a clean compile.
+      - name: Ensure lld is available
+        if: inputs.name == 'Android'
+        run: |
+          brew install lld
+          echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
+
       - name: Install libVLC
         if: contains(inputs.name, 'Linux')
         run: sudo apt install libvlc-dev libvlccore-dev
