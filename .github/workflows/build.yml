@@ -56,20 +56,34 @@ jobs:
           add-to-path: false
           local-cache: true
 
-      # hxcpp shells out to a bare `clang++`, which resolves to Xcode's clang and
-      # then fails to link: it looks for Android builtins under Xcode's resource
-      # dir and for -lc/-lm/-ldl in the host sysroot. Prefer the NDK's own
-      # toolchain, which ships both a matching ld.lld and the Android runtime
-      # libraries. lld from brew is kept as a fallback for anything NDK's
-      # toolchain does not provide.
+# hxcpp shells out to a bare `clang++`, which resolves to /usr/bin/clang++ -
+      # Apple's clang, whose resource directory has no aarch64-linux-android
+      # compiler-rt and whose default linker search path has no libc/libm/libdl.
+      # That is what makes the link fail with
+      #   cannot open .../XcodeDefault.xctoolchain/usr/lib/clang/17/lib/
+      #           aarch64-unknown-linux-android21/libclang_rt.builtins.a
+      # The NDK's own toolchain ships both the Android builtins and a matching
+      # ld.lld, so shadow clang++ with it. Its bin directory does not always
+      # provide clang++ under that exact name, hence the shim.
       - name: Use the NDK toolchain when compiling and linking
         if: inputs.name == 'Android'
         run: |
-          for ndkbin in "${{ steps.setup-ndk.outputs.ndk-path }}"/toolchains/llvm/prebuilt/*/bin; do
-            if [ -d "$ndkbin" ]; then echo "$ndkbin" >> "$GITHUB_PATH"; fi
+          ndkbin=""
+          for d in "${{ steps.setup-ndk.outputs.ndk-path }}"/toolchains/llvm/prebuilt/*/bin; do
+            if [ -d "$d" ]; then ndkbin="$d"; fi
           done
-          brew install lld
-          echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
+          echo "NDK bin: $ndkbin"
+          ls -1 "$ndkbin" | grep -E '^(clang|ld|lld)' || true
+          shim="$RUNNER_TEMP/ndk-shim"
+          mkdir -p "$shim"
+          for c in clang++ clang; do
+            if [ -x "$ndkbin/$c" ]; then
+              ln -sf "$ndkbin/$c" "$shim/$c"
+              echo "shimmed $c -> $ndkbin/$c"
+            fi
+          done
+          echo "$shim" >> "$GITHUB_PATH"
+          echo "$ndkbin" >> "$GITHUB_PATH"
 
       - name: Install libVLC
         if: contains(inputs.name, 'Linux')
