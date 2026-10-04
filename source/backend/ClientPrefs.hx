@@ -23,6 +23,7 @@ import states.TitleState;
 	public var funkyMode:Bool = false; // Experiment: HUD bop theo beat (ngoài PlayState)
 	public var introToMenu:Bool = false; // Experiment: intro.mp4 → MainMenu (bỏ Title), mute intro, play freakyMenu
 	public var customIntroVideo:Bool = false; // Experiment: intro từ mod Engine.json
+	public var osuFreeplay:Bool = false; // Experiment: use the built-in osu-style Freeplay
 	public var bopStyle:String = 'Cube Out'; // Experiment/Engine.json: ease bop (linear, cubeout,...)
 	public var bopBpm:Int = 102; // Engine.json "bop-bpm" — BPM nhịp bop
 	public var gameOverVibration:Bool = false;
