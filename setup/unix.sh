@@ -56,9 +56,34 @@ install_haxelib() {
 	return 1
 }
 
+# Same fallback as install_haxelib, but if lib.haxe.org is unreachable it
+# installs the pinned release straight from the project's git tag instead. Used
+# for openfl, which is the one library that was missing from the cache, so a
+# package-index outage would otherwise block every build.
+install_haxelib_or_git() {
+	name=$1
+	repo=$2
+	ref=$3
+	version=$4
+	shift 4
+	if haxelib_has "$name" "$version"; then
+		return 0
+	fi
+	if haxelib "$@" && haxelib_has "$name" "$version"; then
+		return 0
+	fi
+	echo "Could not get '$name' $version from lib.haxe.org, installing $ref from git." >&2
+	if haxelib git "$name" "$repo" "$ref" --quiet && haxelib_has "$name" "$ref"; then
+		return 0
+	fi
+	echo "ERROR: '$name' could not be installed from lib.haxe.org or git." >&2
+	echo "Present under $HAXELIB_PATH:" >&2
+	ls -1 "$HAXELIB_PATH" >&2 || true
+	return 1
+}
 haxelib git hxcpp https://github.com/kittycathy233/hxcpp --quiet
 haxelib git lime https://github.com/kittycathy233/lime --quiet
-install_haxelib openfl install openfl 9.4.1 --quiet
+install_haxelib_or_git openfl https://github.com/openfl/openfl.git 9.4.1 9.4.1 install openfl 9.4.1 --quiet
 haxelib git flixel https://github.com/kittycathy233/flixel --quiet
 install_haxelib flixel-addons install flixel-addons 3.2.2 --quiet
 install_haxelib flixel-tools install flixel-tools 1.5.1 --quiet
