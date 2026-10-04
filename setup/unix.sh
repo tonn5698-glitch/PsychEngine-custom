@@ -66,14 +66,16 @@ install_haxelib_or_git() {
 	ref=$3
 	version=$4
 	shift 4
-	if haxelib_has "$name" "$version"; then
+	# A library installed by `haxelib git` lives under the version directory
+	# "git", not under the tag it was pinned to, so accept either.
+	if haxelib_has "$name" "$version" || haxelib_has "$name" git; then
 		return 0
 	fi
 	if haxelib "$@" && haxelib_has "$name" "$version"; then
 		return 0
 	fi
 	echo "Could not get '$name' $version from lib.haxe.org, installing $ref from git." >&2
-	if haxelib git "$name" "$repo" "$ref" --quiet && haxelib_has "$name" "$ref"; then
+	if haxelib git "$name" "$repo" "$ref" --quiet && haxelib_has "$name" git; then
 		return 0
 	fi
 	echo "ERROR: '$name' could not be installed from lib.haxe.org or git." >&2
