@@ -64,6 +64,7 @@ class CameraEditorState extends MusicBeatState
     var zoomSlider:PsychUISlider;
     var passSlider:PsychUISlider;
     var fileDialog:FileDialogHandler;
+    public static var lastDifficulty:String = '';
 
     public function new(?s:SwagSong)
     {
@@ -74,6 +75,10 @@ class CameraEditorState extends MusicBeatState
     override function create()
     {
         FlxG.mouse.visible = true;
+        // Phải init trước khi add camera: MusicBeatState.create() gọi initPsychCamera()
+        // (FlxG.cameras.reset -> remove+destroy mọi camera) nếu chưa init, camera preview
+        // sẽ bị destroy và stage không hiện + evaluate() NRE.
+        initPsychCamera();
         if(song == null)
         {
             var msg=new FlxText(20,20,FlxG.width-40,'Open a Psych Engine chart to edit camera events.',24);
@@ -110,7 +115,7 @@ class CameraEditorState extends MusicBeatState
     function makeHeader()
     {
         var bar = new FlxSprite(0,0).makeGraphic(FlxG.width,HEADER,0xFF101010); add(bar);
-        add(new FlxText(12,9,500,'Camera Editor  •  '+song.song,22));
+        add(new FlxText(12,9,650,'Camera Editor  •  '+song.song+'  ['+lastDifficulty+']',22));
         var save = new PsychUIButton(FlxG.width-185,9,'Save',saveChart,80,28); add(save);
         var back = new PsychUIButton(FlxG.width-95,9,'Back',closeEditor,80,28); add(back);
         info = new FlxText(12,HEADER+3,FlxG.width-PANEL-24,'',11); add(info);
@@ -118,6 +123,8 @@ class CameraEditorState extends MusicBeatState
 
     function makePreview()
     {
+        if(stage!=null){remove(stage);stage.destroy();stage=null;}
+        if(preview!=null){FlxG.cameras.remove(preview);preview=null;}
         preview = new FlxCamera(0,HEADER,FlxG.width-PANEL,FlxG.height-HEADER-TIMELINE);
         preview.bgColor = 0xFF303030; FlxG.cameras.add(preview,false);
         stage = new FlxTypedGroup<FlxSprite>(); stage.cameras=[preview]; add(stage);
@@ -125,11 +132,14 @@ class CameraEditorState extends MusicBeatState
         var name = song.stage;
         if(name == null || name.length==0) name = StageData.vanillaSongStage(song.song);
         var sf = StageData.getStageFile(name);
-        var gf:Character = sf.hide_girlfriend ? null : new Character(sf.girlfriend[0],sf.girlfriend[1],song.gfVersion==null?'gf':song.gfVersion);
-        var dad = new Character(sf.opponent[0],sf.opponent[1],song.player2==null?'dad':song.player2);
-        var bf = new Character(sf.boyfriend[0],sf.boyfriend[1],song.player1==null?'bf':song.player1);
-        if(gf!=null) stage.add(gf); stage.add(dad); stage.add(bf);
-        if(sf.objects!=null) StageData.addObjectsToState(sf.objects,gf,dad,bf,stage);
+        if(sf!=null)
+        {
+            var gf:Character = sf.hide_girlfriend ? null : new Character(sf.girlfriend[0],sf.girlfriend[1],song.gfVersion==null?'gf':song.gfVersion);
+            var dad = new Character(sf.opponent[0],sf.opponent[1],song.player2==null?'dad':song.player2);
+            var bf = new Character(sf.boyfriend[0],sf.boyfriend[1],song.player1==null?'bf':song.player1);
+            if(gf!=null) stage.add(gf); stage.add(dad); stage.add(bf);
+            if(sf.objects!=null) StageData.addObjectsToState(sf.objects,gf,dad,bf,stage);
+        }
         add(new FlxText(12,HEADER+25,250,'Stage: '+name,12));
 
         mask = new FlxSprite(0,HEADER).makeGraphic(1,1,FlxColor.BLACK); add(mask);
@@ -252,7 +262,7 @@ class CameraEditorState extends MusicBeatState
     function evaluate()
     {
         var sf=StageData.getStageFile(song.stage==null?StageData.vanillaSongStage(song.song):song.stage);
-        var sx:Float=640,sy:Float=360,z:Float=sf.defaultZoom;
+        var sx:Float=640,sy:Float=360,z:Float=sf!=null?sf.defaultZoom:1;
         var focus:Array<Int>=[],zooms:Array<Int>=[];
         for(i in 0...events.length)if(isCam(events[i])){var n=Std.string(events[i][1][0][0]);if(n=='Camera Follow Pos'||n=='Focus Camera')focus.push(i);if(n=='Add Camera Zoom'||n=='Zoom Camera')zooms.push(i);}
         focus.sort(function(a,b)return events[a][0]<events[b][0]?-1:1);zooms.sort(function(a,b)return events[a][0]<events[b][0]?-1:1);
@@ -263,7 +273,7 @@ class CameraEditorState extends MusicBeatState
             if(k+1<focus.length){var ni=focus[k+1],ne:Array<Dynamic>=cast events[ni],nt=Std.parseFloat(Std.string(ne[0]));if(time<nt&&nt>et){var m=metaFor(i),dur=m==null?DURATION:Std.parseFloat(Std.string(Reflect.field(m,'duration'))),p=Math.max(0,Math.min(1,(time-et)/Math.max(1,Math.min(dur,nt-et)))),en=m!=null&&Reflect.hasField(m,'ease')?Std.string(Reflect.field(m,'ease')):'linear',ed=m!=null&&Reflect.hasField(m,'easeDir')?Std.string(Reflect.field(m,'easeDir')):'out';p=easeValue(p,en,ed);sx+=(Std.parseFloat(Std.string(ne[1][0][1]))-sx)*p;sy+=(Std.parseFloat(Std.string(ne[1][0][2]))-sy)*p;}}
         }
         for(i in zooms)if(Std.parseFloat(Std.string(events[i][0]))<=time){var a=Std.parseFloat(Std.string(events[i][1][0][1]));if(!Math.isNaN(a))z+=a;}
-        if(!relative){preview.zoom=Math.max(.1,z);preview.scroll.set(sx-preview.width/(2*preview.zoom),sy-preview.height/(2*preview.zoom));}
+        if(!relative&&preview!=null&&preview.scroll!=null){preview.zoom=Math.max(.1,z);preview.scroll.set(sx-preview.width/(2*preview.zoom),sy-preview.height/(2*preview.zoom));}
         overlay();
     }
     function overlay()
@@ -326,6 +336,7 @@ class CameraEditorState extends MusicBeatState
     {
         if(song==null){super.update(elapsed);return;}
         if(controls.BACK||FlxG.keys.justPressed.ESCAPE){closeEditor();return;}
+        if(preview==null||preview.scroll==null){super.update(elapsed);return;}
         if(playing){seek(time+elapsed*1000);if(time>chartLength())seek(0);}
         #if FLX_TOUCH
         if(FlxG.touches != null && FlxG.touches.list.length >= 2)
