@@ -50,53 +50,11 @@ jobs:
       - name: Setup Android NDK
         if: inputs.name == 'Android'
         id: setup-ndk
-        uses: nttld/setup-ndk@main
+        uses: nttld/setup-ndk@v1.5.0
         with:
           ndk-version: r27c
-          add-to-path: false
+          add-to-path: true
           local-cache: true
-
-# hxcpp shells out to bare clang++ and ld.lld. Do not let those
-      # resolve to Apple's host toolchain: Android builds need the NDK compiler
-      # and linker. Some macOS NDK layouts expose clang only as a versioned
-      # executable, so create stable shim names explicitly.
-      - name: Use the NDK toolchain when compiling and linking
-        if: inputs.name == 'Android'
-        run: |
-          ndkbin=""
-          for d in "${{ steps.setup-ndk.outputs.ndk-path }}"/toolchains/llvm/prebuilt/*/bin; do
-            if [ -d "$d" ]; then ndkbin="$d"; fi
-          done
-          test -n "$ndkbin"
-          echo "NDK bin: $ndkbin"
-
-          shim="$RUNNER_TEMP/ndk-shim"
-          mkdir -p "$shim"
-
-          if [ -x "$ndkbin/clang++" ]; then
-            ln -sf "$ndkbin/clang++" "$shim/clang++"
-          elif [ -x "$ndkbin/clang" ]; then
-            ln -sf "$ndkbin/clang" "$shim/clang++"
-          else
-            echo "ERROR: NDK clang compiler not found in $ndkbin" >&2
-            exit 1
-          fi
-          ln -sf "$ndkbin/clang" "$shim/clang"
-
-          if [ -x "$ndkbin/ld.lld" ]; then
-            ln -sf "$ndkbin/ld.lld" "$shim/ld.lld"
-          else
-            brew install lld
-            ln -sf "$(brew --prefix lld)/bin/ld.lld" "$shim/ld.lld"
-          fi
-
-          echo "$shim" >> "$GITHUB_PATH"
-          echo "$ndkbin" >> "$GITHUB_PATH"
-
-          echo "clang++: $shim/clang++"
-          echo "ld.lld: $shim/ld.lld"
-          "$shim/clang++" --version
-          "$shim/ld.lld" --version
 
       - name: Install libVLC
         if: contains(inputs.name, 'Linux')
