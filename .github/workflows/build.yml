@@ -56,15 +56,10 @@ jobs:
           add-to-path: false
           local-cache: true
 
-# hxcpp shells out to a bare `clang++`, which resolves to /usr/bin/clang++ -
-      # Apple's clang, whose resource directory has no aarch64-linux-android
-      # compiler-rt and whose default linker search path has no libc/libm/libdl.
-      # That is what makes the link fail with
-      #   cannot open .../XcodeDefault.xctoolchain/usr/lib/clang/17/lib/
-      #           aarch64-unknown-linux-android21/libclang_rt.builtins.a
-      # The NDK's own toolchain ships both the Android builtins and a matching
-      # ld.lld, so shadow clang++ with it. Its bin directory does not always
-      # provide clang++ under that exact name, hence the shim.
+# hxcpp shells out to bare clang++ and ld.lld. Do not let those
+      # resolve to Apple's host toolchain: Android builds need the NDK compiler
+      # and linker. Some macOS NDK layouts expose clang only as a versioned
+      # executable, so create stable shim names explicitly.
       - name: Use the NDK toolchain when compiling and linking
         if: inputs.name == 'Android'
         run: |
@@ -72,18 +67,36 @@ jobs:
           for d in "${{ steps.setup-ndk.outputs.ndk-path }}"/toolchains/llvm/prebuilt/*/bin; do
             if [ -d "$d" ]; then ndkbin="$d"; fi
           done
+          test -n "$ndkbin"
           echo "NDK bin: $ndkbin"
-          ls -1 "$ndkbin" | grep -E '^(clang|ld|lld)' || true
+
           shim="$RUNNER_TEMP/ndk-shim"
           mkdir -p "$shim"
-          for c in clang++ clang; do
-            if [ -x "$ndkbin/$c" ]; then
-              ln -sf "$ndkbin/$c" "$shim/$c"
-              echo "shimmed $c -> $ndkbin/$c"
-            fi
-          done
+
+          if [ -x "$ndkbin/clang++" ]; then
+            ln -sf "$ndkbin/clang++" "$shim/clang++"
+          elif [ -x "$ndkbin/clang" ]; then
+            ln -sf "$ndkbin/clang" "$shim/clang++"
+          else
+            echo "ERROR: NDK clang compiler not found in $ndkbin" >&2
+            exit 1
+          fi
+          ln -sf "$ndkbin/clang" "$shim/clang"
+
+          if [ -x "$ndkbin/ld.lld" ]; then
+            ln -sf "$ndkbin/ld.lld" "$shim/ld.lld"
+          else
+            brew install lld
+            ln -sf "$(brew --prefix lld)/bin/ld.lld" "$shim/ld.lld"
+          fi
+
           echo "$shim" >> "$GITHUB_PATH"
           echo "$ndkbin" >> "$GITHUB_PATH"
+
+          echo "clang++: $shim/clang++"
+          echo "ld.lld: $shim/ld.lld"
+          "$shim/clang++" --version
+          "$shim/ld.lld" --version
 
       - name: Install libVLC
         if: contains(inputs.name, 'Linux')
