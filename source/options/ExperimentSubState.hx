@@ -54,6 +54,16 @@ class ExperimentSubState extends BaseOptionsMenu
 			'customIntroVideo', BOOL);
 		addOption(option);
 
+		option = new Option('Performance / Benchmark Test',
+			'Runs a short loading-performance test and saves the result for future loading-time estimates.',
+			'performanceBenchmarkAction', STRING, ['Run benchmark']);
+		option.onAccept = () ->
+		{
+			persistentUpdate = false;
+			openSubState(new PerformanceBenchmarkSubState());
+		};
+		addOption(option);
+
 		super();
 	}
 

@@ -111,6 +111,13 @@ import states.TitleState;
 	public var guitarHeroSustains:Bool = true;
 	public var discordRPC:Bool = true;
 	public var loadingScreen:Bool = true;
+	public var loadingBenchmarkVersion:Int = 0;
+	public var loadingBenchmarkDone:Bool = false;
+	public var loadingBenchmarkAssetMs:Float = 0;
+	public var loadingBenchmarkObjectMs:Float = 0;
+	public var loadingBenchmarkChartMs:Float = 0;
+	public var loadingBenchmarkScore:Float = 0;
+	public var performanceBenchmarkAction:String = 'Run benchmark';
 	public var language:String = 'en-US';
 }
 

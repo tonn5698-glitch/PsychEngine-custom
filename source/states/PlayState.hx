@@ -270,6 +270,147 @@ class PlayState extends MusicBeatState
 	private static var _lastLoadedModDirectory:String = '';
 	public static var nextReloadAll:Bool = false;
 
+	// LoadingState uses this lightweight preparation pass to receive real
+	// PlayState progress before the state is switched in. It deliberately does
+	// NOT create Flixel objects, cameras, HUD or scripts.
+	public static var loadingPreparationReady:Bool = false;
+	public static var loadingPreparationProgress:Float = 0;
+	public static var loadingPreparationStatus:String = 'Preparing gameplay...';
+	private static var loadingPreparationStep:Int = 0;
+	private static var loadingPreparationCharacters:Array<String> = [];
+	private static var loadingPreparationCharacterIndex:Int = 0;
+	private static var loadingPreparationSectionIndex:Int = 0;
+	private static var loadingPreparationNoteIndex:Int = 0;
+	private static var loadingPreparationTotalNotes:Int = 0;
+	private static var loadingPreparationDoneNotes:Int = 0;
+
+	public static function beginLoadingPreparation():Void
+	{
+		loadingPreparationReady = false;
+		loadingPreparationProgress = 0;
+		loadingPreparationStatus = 'Preparing gameplay...';
+		loadingPreparationStep = 0;
+		loadingPreparationCharacters = [];
+		loadingPreparationCharacterIndex = 0;
+		loadingPreparationSectionIndex = 0;
+		loadingPreparationNoteIndex = 0;
+		loadingPreparationTotalNotes = 0;
+		loadingPreparationDoneNotes = 0;
+	}
+
+	public static function updateLoadingPreparation():Void
+	{
+		if(loadingPreparationReady || SONG == null)
+		{
+			if(SONG == null)
+			{
+				loadingPreparationProgress = 1;
+				loadingPreparationStatus = 'Ready';
+				loadingPreparationReady = true;
+			}
+			return;
+		}
+
+		try
+		{
+			switch(loadingPreparationStep)
+			{
+				case 0:
+					loadingPreparationStatus = 'Preparing song data...';
+					if(SONG.stage == null || SONG.stage.length < 1)
+						SONG.stage = StageData.vanillaSongStage(Paths.formatToSongPath(Song.loadedSongName));
+					loadingPreparationProgress = 0.10;
+					loadingPreparationStep++;
+
+				case 1:
+					loadingPreparationStatus = 'Preparing stage...';
+					StageData.getStageFile(SONG.stage);
+					loadingPreparationProgress = 0.22;
+					loadingPreparationStep++;
+
+				case 2:
+					if(loadingPreparationCharacters.length < 1)
+					{
+						for(char in [SONG.player1, SONG.player2, SONG.gfVersion])
+							if(char != null && char.length > 0 && !loadingPreparationCharacters.contains(char))
+								loadingPreparationCharacters.push(char);
+					}
+					if(loadingPreparationCharacterIndex < loadingPreparationCharacters.length)
+					{
+						loadingPreparationStatus = 'Preparing character ' + (loadingPreparationCharacterIndex + 1) + '/' + loadingPreparationCharacters.length + '...';
+					prepareCharacterData(loadingPreparationCharacters[loadingPreparationCharacterIndex]);
+					loadingPreparationCharacterIndex++;
+					loadingPreparationProgress = 0.22 + (0.23 * loadingPreparationCharacterIndex / Math.max(1, loadingPreparationCharacters.length));
+					}
+					else
+					{
+						loadingPreparationStep++;
+					}
+
+				case 3:
+					if(loadingPreparationTotalNotes < 1 && SONG.notes != null)
+					{
+						for(section in SONG.notes)
+							if(section != null && section.sectionNotes != null)
+								loadingPreparationTotalNotes += section.sectionNotes.length;
+					}
+					if(loadingPreparationDoneNotes < loadingPreparationTotalNotes)
+					{
+						var budget:Int = 250;
+						while(budget-- > 0 && loadingPreparationSectionIndex < SONG.notes.length)
+						{
+							var section = SONG.notes[loadingPreparationSectionIndex];
+							if(section == null || section.sectionNotes == null || loadingPreparationNoteIndex >= section.sectionNotes.length)
+							{
+								loadingPreparationSectionIndex++;
+								loadingPreparationNoteIndex = 0;
+								continue;
+							}
+							loadingPreparationNoteIndex++;
+							loadingPreparationDoneNotes++;
+						}
+						loadingPreparationStatus = 'Preparing chart... ' + loadingPreparationDoneNotes + '/' + loadingPreparationTotalNotes;
+						loadingPreparationProgress = 0.45 + (0.40 * loadingPreparationDoneNotes / Math.max(1, loadingPreparationTotalNotes));
+					}
+					else
+					{
+						loadingPreparationStep++;
+					}
+
+				case 4:
+					loadingPreparationStatus = 'Preparing events...';
+					try { Song.getChart('events', SONG.song); } catch(e:Dynamic) {}
+					loadingPreparationProgress = 0.95;
+					loadingPreparationStep++;
+
+				case 5:
+					loadingPreparationStatus = 'PlayState ready';
+					loadingPreparationProgress = 1;
+					loadingPreparationReady = true;
+			}
+		}
+		catch(e:Dynamic)
+		{
+			trace('PlayState loading preparation warning: $e');
+			loadingPreparationStep++;
+		}
+	}
+
+	private static function prepareCharacterData(char:String):Void
+	{
+		if(char == null || char.length < 1) return;
+		try
+		{
+			var path:String = Paths.getPath('characters/$char.json', TEXT);
+			#if MODS_ALLOWED
+			if(FileSystem.exists(path)) Json.parse(File.getContent(path));
+			#else
+			if(Assets.exists(path)) Json.parse(Assets.getText(path));
+			#end
+		}
+		catch(e:Dynamic) {}
+	}
+
 	public var luaTouchPad:TouchPad;
 
 	override public function create()

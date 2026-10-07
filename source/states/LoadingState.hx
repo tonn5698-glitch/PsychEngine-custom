@@ -15,6 +15,7 @@ import flash.media.Sound;
 
 import backend.Song;
 import backend.StageData;
+import backend.LoadingPerformance;
 import objects.Character;
 
 import sys.thread.Thread;
@@ -61,6 +62,9 @@ class LoadingState extends MusicBeatState
 	var intendedPercent:Float = 0;
 	var curPercent:Float = 0;
 	var stateChangeDelay:Float = 0;
+	var loadingElapsed:Float = 0;
+	var playStatePreparationStarted:Bool = false;
+	var playStatePreparationRequired:Bool = false;
 
 	#if PSYCH_WATERMARKS
 	var logo:FlxSprite;
@@ -180,9 +184,11 @@ class LoadingState extends MusicBeatState
 		#end
 		applyLoadingScreenConfig(barBack, bar);
 
+		playStatePreparationRequired = Std.isOfType(target, PlayState);
+
 		super.create();
 
-		if (stateChangeDelay <= 0 && checkLoaded())
+		if (stateChangeDelay <= 0 && checkLoaded() && (!playStatePreparationRequired || PlayState.loadingPreparationReady))
 		{
 			dontUpdate = true;
 			onLoad();
@@ -263,7 +269,25 @@ class LoadingState extends MusicBeatState
 
 		if (!transitioning)
 		{
-			if (!finishedLoading && checkLoaded())
+			loadingElapsed += elapsed;
+			var assetsReady:Bool = checkLoaded();
+			if(playStatePreparationRequired && assetsReady)
+			{
+				if(!playStatePreparationStarted)
+				{
+					playStatePreparationStarted = true;
+					PlayState.beginLoadingPreparation();
+				}
+				PlayState.updateLoadingPreparation();
+			}
+
+			var prepPercent:Float = playStatePreparationRequired ? PlayState.loadingPreparationProgress : 1;
+			var assetPercent:Float = loadMax > 0 ? Math.min(1, loaded / loadMax) : 1;
+			intendedPercent = playStatePreparationRequired
+				? (assetPercent * 0.75 + prepPercent * 0.25)
+				: assetPercent;
+
+			if (!finishedLoading && assetsReady && (!playStatePreparationRequired || PlayState.loadingPreparationReady))
 			{
 				if(stateChangeDelay <= 0)
 				{
@@ -273,7 +297,6 @@ class LoadingState extends MusicBeatState
 				}
 				else stateChangeDelay = Math.max(0, stateChangeDelay - elapsed);
 			}
-			intendedPercent = loaded / loadMax;
 		}
 
 		if (curPercent != intendedPercent)
@@ -306,7 +329,17 @@ class LoadingState extends MusicBeatState
 			case 2:
 				dots = '...';
 		}
-		loadingText.text = Language.getPhrase('now_loading', 'Now Loading{1}', [dots]);
+		var statusText:String = playStatePreparationRequired && PlayState.loadingPreparationStatus != null
+			? PlayState.loadingPreparationStatus
+			: Language.getPhrase('now_loading', 'Now Loading{1}', [dots]);
+
+		if(loadingElapsed > 0.5 && intendedPercent > 0.02 && intendedPercent < 0.999)
+		{
+			var estimatedTotalMs:Float = LoadingPerformance.estimate((loadingElapsed * 1000) / intendedPercent);
+			var remainingSeconds:Int = Std.int(Math.ceil(Math.max(0, estimatedTotalMs - loadingElapsed * 1000) / 1000));
+			statusText += '  ~' + remainingSeconds + 's';
+		}
+		loadingText.text = statusText;
 
 		if(!spawnedPessy)
 		{
@@ -386,7 +419,8 @@ class LoadingState extends MusicBeatState
 		if (stopMusic && FlxG.sound.music != null)
 			FlxG.sound.music.stop();
 
-		FlxG.camera.visible = false;
+		// Keep the loading camera visible until the actual state switch. Hiding it
+		// here created a black frame/gap on slower PlayState initialization paths.
 		MusicBeatState.switchState(target);
 		transitioning = true;
 		finishedLoading = true;
