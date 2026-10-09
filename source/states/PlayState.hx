@@ -2335,7 +2335,7 @@ class PlayState extends MusicBeatState
 		}
 	}
 
-\tpublic function triggerEvent(eventName:String, value1:String, value2:String, strumTime:Float) {
+	public function triggerEvent(eventName:String, value1:String, value2:String, strumTime:Float) {
 		#if VIDEOS_ALLOWED
 		if (eventName == 'VideoSprite')
 		{
