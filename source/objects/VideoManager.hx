@@ -26,7 +26,12 @@ class VideoManager
 			var found:Int = FlxG.cameras.list.indexOf(PlayState.instance.camHUD);
 			if (found >= 0) hudIndex = found;
 		}
-		FlxG.cameras.insert(customCamera, hudIndex, false);
+		FlxG.cameras.add(customCamera, false);
+		if (hudIndex >= 0 && hudIndex < FlxG.cameras.list.length - 1)
+		{
+			FlxG.cameras.list.remove(customCamera);
+			FlxG.cameras.list.insert(hudIndex, customCamera);
+		}
 	}
 
 	public function play(name:String, cameraName:String = 'custom', layer:Int = -1, loop:Bool = false, canSkip:Bool = false):VideoSprite
@@ -54,7 +59,6 @@ class VideoManager
 		var camera:FlxCamera = getCamera(cameraName);
 		video.cameras = [camera];
 		video.videoSprite.cameras = [camera];
-		video.videoSprite.autoPause = false;
 
 		if (!loop)
 		{
