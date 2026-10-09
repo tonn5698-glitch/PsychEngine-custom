@@ -24,7 +24,6 @@ class PsychGlobalScript
 
 	function loadScripts()
 	{
-		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 		var owner:MusicBeatState = MusicBeatState.getState();
 		var loadedPaths:Array<String> = [];
 
