@@ -472,7 +472,8 @@ class LoadingState extends MusicBeatState
 	static function getNextState(target:FlxState, stopMusic = false, intrusive:Bool = true):FlxState
 	{
 		#if !SHOW_LOADING_SCREEN
-		intrusive = false;
+		// Keep the loading screen for gameplay even when ordinary transitions disable it.
+		if (!Std.isOfType(target, PlayState)) intrusive = false;
 		#end
 
 		LoadingState.isIntrusive = intrusive;

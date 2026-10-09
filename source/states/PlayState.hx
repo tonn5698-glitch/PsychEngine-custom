@@ -385,8 +385,10 @@ class PlayState extends MusicBeatState
 					}
 
 				case 4:
-					loadingPreparationStatus = 'Preparing events...';
-					try { Song.getChart('events', SONG.song); } catch(e:Dynamic) {}
+					// Event charts are loaded/merged by the normal song-generation path.
+					// Do not call Song.getChart() here: it can perform synchronous file
+					// discovery/parsing and stall the loading screen on some mod charts.
+					loadingPreparationStatus = 'Finalizing event data...';
 					loadingPreparationProgress = 0.95;
 					loadingPreparationStep++;
 
@@ -2805,7 +2807,7 @@ class PlayState extends MusicBeatState
 
 					canResync = false;
 					LoadingState.prepareToSong();
-					LoadingState.loadAndSwitchState(new PlayState(), false, false);
+					LoadingState.loadAndSwitchState(new PlayState(), false, true);
 				}
 			}
 			else
