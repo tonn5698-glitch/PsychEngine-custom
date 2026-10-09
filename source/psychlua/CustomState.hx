@@ -23,10 +23,12 @@ class CustomState extends MusicBeatState
 {
 	public static var instance:CustomState;
 	public var stateName:String = 'unnamed';
+	public var scriptFile:Null<String> = null;
 
-	public function new(stateName:String)
+	public function new(stateName:String, ?scriptFile:String)
 	{
 		this.stateName = stateName;
+		this.scriptFile = scriptFile;
 		super();
 	}
 
@@ -36,7 +38,22 @@ class CustomState extends MusicBeatState
 		super.create(); // MusicBeatState.create() đã lo camera + fade-in
 
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'customStates/$stateName/'))
+		if (scriptFile != null)
+		{
+			var ext:String = haxe.io.Path.extension(scriptFile).toLowerCase();
+			#if LUA_ALLOWED
+			if (ext == 'lua')
+				new FunkinLua(scriptFile);
+			#end
+			#if HSCRIPT_ALLOWED
+			if (ext == 'hx' || ext == 'hscript')
+			{
+				var script:HScript = new HScript(null, scriptFile);
+				hscriptArray.push(script);
+			}
+			#end
+		}
+		else for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'customStates/$stateName/'))
 		{
 			#if linux
 			for (file in CoolUtil.sortAlphabetically(Paths.readDirectory(folder)))

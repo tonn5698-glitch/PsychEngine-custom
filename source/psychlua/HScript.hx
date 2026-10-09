@@ -174,6 +174,8 @@ class HScript extends Iris
 		set('Note', objects.Note);
 		set('CustomSubstate', CustomSubstate);
 		set('CustomState', psychlua.CustomState);
+		set('StateScriptManager', psychlua.StateScriptManager);
+		set('registerStateOverride', function(originalState:String, customState:String, ?modName:String) return psychlua.StateScriptManager.registerStateOverride(originalState, customState, modName == null ? this.modFolder : modName));
 		// CNE shim classes
 		set('FunkinText', funkin.backend.FunkinText);
 		set('FunkinSprite', funkin.backend.FunkinSprite);

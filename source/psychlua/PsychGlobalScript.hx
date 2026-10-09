@@ -1,5 +1,9 @@
 package psychlua;
 
+import backend.MusicBeatState;
+import backend.Mods;
+import backend.Paths;
+
 #if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 class PsychGlobalScript
 {
@@ -47,12 +51,54 @@ class PsychGlobalScript
 				}
 			}
 		}
+		// Also support Codename-style global entry points in the active mod's data folder.
+		#if MODS_ALLOWED
+		var candidates:Array<String> = [];
+		for (mod in Mods.parseList().enabled) if (!candidates.contains(mod)) candidates.push(mod);
+		for (mod in Mods.getModDirectories()) if (!candidates.contains(mod)) candidates.push(mod);
+		for (mod in candidates)
+		{
+			for (root in Paths.modRootDirs)
+			{
+				var base:String = Paths.modsRootByName(root) + mod + '/data/';
+				for (name in ['global.hx', 'global.lua'])
+				{
+					var file:String = base + name;
+					if (sys.FileSystem.exists(file) && !loadedPaths.contains(file))
+					{
+						loadGlobalFile(file, mod);
+						loadedPaths.push(file);
+					}
+				}
+			}
+		}
 		#end
 
 		callOnScripts('onCreate', []);
 	}
 
 	#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+	function loadGlobalFile(file:String, modName:String):Void
+	{
+		var owner:MusicBeatState = MusicBeatState.getState();
+		var ext:String = haxe.io.Path.extension(file).toLowerCase();
+		#if LUA_ALLOWED
+		if (ext == 'lua')
+		{
+			var lua:FunkinLua = new FunkinLua(file);
+			if (owner != null) owner.luaArray.remove(lua);
+			luaArray.push(lua);
+		}
+		#end
+		#if HSCRIPT_ALLOWED
+		if (ext == 'hx')
+		{
+			var script:HScript = new HScript(null, file);
+			hscriptArray.push(script);
+		}
+		#end
+	}
+
 	function loadFolder(folder:String)
 	{
 		var owner:MusicBeatState = MusicBeatState.getState();
@@ -71,7 +117,6 @@ class PsychGlobalScript
 			if (file.toLowerCase().endsWith('.hx'))
 			{
 				var script = new HScript(null, folder + file);
-				if (script.exists('onCreate')) script.call('onCreate');
 				hscriptArray.push(script);
 			}
 			#end

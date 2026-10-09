@@ -6,6 +6,7 @@ import backend.Mods;
 import psychlua.LuaUtils;
 #if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 import psychlua.PsychGlobalScript;
+import psychlua.StateScriptManager;
 #end
 #if LUA_ALLOWED
 import psychlua.FunkinLua;
@@ -312,6 +313,10 @@ class MusicBeatState extends FlxState
 
 	public static function switchState(nextState:FlxState = null) {
 		if(nextState == null) nextState = FlxG.state;
+		#if (MODS_ALLOWED && (LUA_ALLOWED || HSCRIPT_ALLOWED))
+		if (nextState != FlxG.state)
+			nextState = StateScriptManager.resolveState(nextState);
+		#end
 		if(nextState == FlxG.state)
 		{
 			resetState();

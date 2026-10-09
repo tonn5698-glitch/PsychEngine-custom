@@ -1699,6 +1699,7 @@ class FunkinLua {
 		ExtraFunctions.implement(this);
 		CustomSubstate.implement(this);
 		CustomStateFunctions.implement(this);
+		Lua_helper.add_callback(lua, "registerStateOverride", function(originalState:String, customState:String, ?modName:String) return StateScriptManager.registerStateOverride(originalState, customState, modName == null ? this.modFolder : modName));
 		CustomFreeplayFunctions.implement(this);
 		CustomMenuFunctions.implement(this);
 		ShaderFunctions.implement(this);
