@@ -37,6 +37,9 @@ import openfl.filters.ShaderFilter;
 import shaders.ErrorHandledShader;
 
 import objects.VideoSprite;
+#if VIDEOS_ALLOWED
+import objects.VideoManager;
+#end
 import objects.Note.EventNote;
 import objects.*;
 import states.stages.*;
@@ -147,6 +150,10 @@ class PlayState extends MusicBeatState
 	public var inst:FlxSound;
 	public var vocals:FlxSound;
 	public var opponentVocals:FlxSound;
+
+	#if VIDEOS_ALLOWED
+	public var videoManager:VideoManager;
+	#end
 
 	public var dad:Character = null;
 	public var gf:Character = null;
@@ -475,6 +482,10 @@ class PlayState extends MusicBeatState
 		FlxG.cameras.add(camHUD, false);
 		FlxG.cameras.add(camOther, false);
 		FlxG.cameras.add(luaTpadCam, false);
+
+		#if VIDEOS_ALLOWED
+		videoManager = new VideoManager(this);
+		#end
 
 		persistentUpdate = true;
 		persistentDraw = true;
@@ -1825,6 +1836,9 @@ class PlayState extends MusicBeatState
 		stagesFunc(function(stage:BaseStage) stage.openSubState(SubState));
 		if (paused)
 		{
+			#if VIDEOS_ALLOWED
+			if (videoManager != null) videoManager.pauseAll();
+			#end
 			if (FlxG.sound.music != null)
 			{
 				FlxG.sound.music.pause();
@@ -1846,6 +1860,9 @@ class PlayState extends MusicBeatState
 		stagesFunc(function(stage:BaseStage) stage.closeSubState());
 		if (paused)
 		{
+			#if VIDEOS_ALLOWED
+			if (videoManager != null) videoManager.resumeAll();
+			#end
 			if (FlxG.sound.music != null && !startingSong && canResync)
 			{
 				resyncVocals();
@@ -2318,7 +2335,45 @@ class PlayState extends MusicBeatState
 		}
 	}
 
-	public function triggerEvent(eventName:String, value1:String, value2:String, strumTime:Float) {
+\tpublic function triggerEvent(eventName:String, value1:String, value2:String, strumTime:Float) {
+		#if VIDEOS_ALLOWED
+		if (eventName == 'VideoSprite')
+		{
+			var videoName:String = value1 != null ? value1.trim() : '';
+			var cameraName:String = 'custom';
+			var layer:Int = -1;
+			var loop:Bool = false;
+			var canSkip:Bool = false;
+
+			if (value2 != null && value2.trim().length > 0)
+			{
+				for (part in value2.split(';'))
+				{
+					var pair:Array<String> = part.split('=');
+					if (pair.length < 2) continue;
+					var key:String = pair[0].trim().toLowerCase();
+					var val:String = pair.slice(1).join('=').trim();
+					switch (key)
+					{
+						case 'camera': cameraName = val;
+						case 'layer':
+							var parsedLayer:Null<Int> = Std.parseInt(val);
+							layer = parsedLayer == null ? -1 : parsedLayer;
+						case 'loop': loop = (val.toLowerCase() == 'true' || val == '1');
+						case 'skip': canSkip = (val.toLowerCase() == 'true' || val == '1');
+					}
+				}
+			}
+
+			if (videoManager != null && videoName.length > 0)
+			{
+				var video:VideoSprite = videoManager.play(videoName, cameraName, layer, loop, canSkip);
+				if (video == null)
+					FlxG.log.warn('Video not found: ' + videoName);
+			}
+			return;
+		}
+		#end
 		var flValue1:Null<Float> = Std.parseFloat(value1);
 		var flValue2:Null<Float> = Std.parseFloat(value2);
 		if(Math.isNaN(flValue1)) flValue1 = null;
@@ -3497,6 +3552,11 @@ class PlayState extends MusicBeatState
 		{
 			videoCutscene.destroy();
 			videoCutscene = null;
+		}
+		if(videoManager != null)
+		{
+			videoManager.destroy();
+			videoManager = null;
 		}
 		#end
 
