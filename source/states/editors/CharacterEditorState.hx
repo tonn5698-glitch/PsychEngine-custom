@@ -1,5 +1,10 @@
 package states.editors;
 
+import backend.StageData;
+#if LUA_ALLOWED
+import psychlua.FunkinLua;
+#end
+
 import flixel.graphics.FlxGraphic;
 
 import flixel.system.debug.interaction.tools.Pointer.GraphicCursorCross;
@@ -26,6 +31,15 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 	var animateGhost:FlxAnimate;
 	var animateGhostImage:String;
 	var cameraFollowPointer:FlxSprite;
+	var stagePreviewGroup:FlxSpriteGroup;
+	var stagePreviewFrontSprites:Array<FlxSprite> = [];
+	var stagePreviewJsonTags:Array<String> = [];
+	var stagePreviewStage:String = 'stage';
+	var stagePreviewDropDown:PsychUIDropDownMenu;
+	var stagePreviewStepStepper:PsychUINumericStepper;
+	#if LUA_ALLOWED
+	var stagePreviewLua:FunkinLua;
+	#end
 	var isAnimateSprite:Bool = false;
 
 	var silhouettes:FlxSpriteGroup;
@@ -85,6 +99,9 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		FlxG.cameras.add(camHUD, false);
 
 		loadBG();
+
+		stagePreviewGroup = new FlxSpriteGroup();
+		add(stagePreviewGroup);
 
 		silhouettes = new FlxSpriteGroup();
 		add(silhouettes);
@@ -163,6 +180,8 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		FlxG.camera.zoom = 1;
 
 		makeUIMenu();
+		refreshStagePreviewDropDown();
+		refreshStagePreview();
 
 		updatePointerPos();
 		updateHealthBar();
@@ -282,7 +301,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 	function makeUIMenu()
 	{
-		UI_box = new PsychUIBox(FlxG.width - 275, 25, 250, 120, ['Ghost', 'Settings']);
+		UI_box = new PsychUIBox(FlxG.width - 275, 25, 250, 155, ['Ghost', 'Settings', 'Stage Preview']);
 		UI_box.scrollFactor.set();
 		UI_box.cameras = [camHUD];
 
@@ -296,9 +315,136 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		addSettingsUI();
 		addAnimationsUI();
 		addCharacterUI();
+		addStagePreviewUI();
 
 		UI_box.selectedName = 'Settings';
 		UI_characterbox.selectedName = 'Character';
+	}
+
+	function addStagePreviewUI()
+	{
+		var tab_group = UI_box.getTab('Stage Preview').menu;
+		stagePreviewDropDown = new PsychUIDropDownMenu(10, 30, ['stage'], function(index:Int, selected:String)
+		{
+			if(selected == null || selected.length < 1 || selected == stagePreviewStage) return;
+			stagePreviewStage = selected;
+			if(stagePreviewStepStepper != null) stagePreviewStepStepper.value = 0;
+			refreshStagePreview();
+		}, 145);
+		stagePreviewStepStepper = new PsychUINumericStepper(10, 82, 1, 0, 0, 4096, 0, 85);
+		stagePreviewStepStepper.onValueChange = function() refreshStagePreview();
+		var reloadPreview:PsychUIButton = new PsychUIButton(120, 82, 'Reload', function() refreshStagePreview());
+		tab_group.add(new FlxText(10, 12, 80, 'Stage:'));
+		tab_group.add(stagePreviewDropDown);
+		tab_group.add(new FlxText(10, 64, 80, 'Step:'));
+		tab_group.add(stagePreviewStepStepper);
+		tab_group.add(reloadPreview);
+	}
+
+	function refreshStagePreviewDropDown()
+	{
+		if(stagePreviewDropDown == null) return;
+		var stageList:Array<String> = [];
+		var foldersToCheck:Array<String> = Mods.directoriesWithFile(Paths.getSharedPath(), 'stages/');
+		for(folder in foldersToCheck)
+			for(file in Paths.readDirectory(folder))
+				if(file.toLowerCase().endsWith('.json') || file.toLowerCase().endsWith('.lua'))
+				{
+					var name = file.substr(0, file.lastIndexOf('.'));
+					if(!stageList.contains(name)) stageList.push(name);
+				}
+		if(!stageList.contains('stage')) stageList.push('stage');
+		stageList.sort(function(a:String, b:String) return a.toLowerCase() < b.toLowerCase() ? -1 : (a.toLowerCase() > b.toLowerCase() ? 1 : 0));
+		stagePreviewDropDown.list = stageList;
+		if(!stageList.contains(stagePreviewStage)) stagePreviewStage = stageList[0];
+		stagePreviewDropDown.selectedLabel = stagePreviewStage;
+	}
+
+	public function addStagePreviewLuaSprite(sprite:FlxSprite, inFront:Bool = false):Void
+	{
+		if(sprite == null || stagePreviewGroup == null) return;
+		if(inFront)
+		{
+			var charIndex = members.indexOf(character);
+			if(charIndex >= 0) insert(charIndex + 1, sprite) else add(sprite);
+			stagePreviewFrontSprites.push(sprite);
+		}
+		else stagePreviewGroup.add(sprite);
+	}
+
+	function refreshStagePreview()
+	{
+		if(stagePreviewGroup == null) return;
+		#if LUA_ALLOWED
+		if(stagePreviewLua != null)
+		{
+			stagePreviewLua.call('onDestroy', []);
+			for(tag in stagePreviewLua.stagePreviewTags) variables.remove(tag);
+			stagePreviewLua.stop();
+			luaArray.remove(stagePreviewLua);
+			stagePreviewLua = null;
+		}
+		#end
+		for(tag in stagePreviewJsonTags) variables.remove(tag);
+		stagePreviewJsonTags = [];
+		for(sprite in stagePreviewFrontSprites)
+		{
+			remove(sprite, true);
+			sprite.destroy();
+		}
+		stagePreviewFrontSprites = [];
+		for(sprite in stagePreviewGroup.members.copy())
+			if(sprite != null)
+			{
+				stagePreviewGroup.remove(sprite, true);
+				sprite.destroy();
+			}
+
+		var previousLevel = Paths.currentLevel;
+		var stageData:StageFile = StageData.getStageFile(stagePreviewStage);
+		Paths.setCurrentLevel(stageData.directory != null && stageData.directory.length > 0 ? stageData.directory : 'shared');
+		if(stageData.objects != null && stageData.objects.length > 0)
+		{
+			var stageObjects:Map<String, FlxSprite> = StageData.addObjectsToState(stageData.objects, null, null, null, stagePreviewGroup, false);
+			for(key => sprite in stageObjects)
+				if(!StageData.reservedNames.contains(key))
+				{
+					variables.set(key, sprite);
+					stagePreviewJsonTags.push(key);
+				}
+		}
+
+		#if LUA_ALLOWED
+		var luaPath:String = Paths.getSharedPath('stages/' + stagePreviewStage + '.lua');
+		#if MODS_ALLOWED
+		var modLuaPath:String = Paths.modFolders('stages/' + stagePreviewStage + '.lua');
+		if(FileSystem.exists(modLuaPath)) luaPath = modLuaPath;
+		#end
+		#if sys
+		if(FileSystem.exists(luaPath))
+		#else
+		if(Assets.exists(luaPath))
+		#end
+		{
+			stagePreviewLua = new FunkinLua(luaPath, true, stagePreviewStage);
+			stagePreviewLua.call('onCreatePost', []);
+			var targetStep:Int = Std.int(stagePreviewStepStepper != null ? stagePreviewStepStepper.value : 0);
+			for(step in 0...(targetStep + 1))
+			{
+				stagePreviewLua.stagePreviewSimulatingSteps = true;
+				stagePreviewLua.set('curStep', step);
+				stagePreviewLua.set('curBeat', Std.int(step / 4));
+				stagePreviewLua.set('curSection', Std.int(step / 16));
+				stagePreviewLua.set('curDecStep', step);
+				stagePreviewLua.set('curDecBeat', step / 4);
+				if(step % 16 == 0) stagePreviewLua.call('onSectionHit', []);
+				if(step % 4 == 0) stagePreviewLua.call('onBeatHit', []);
+				stagePreviewLua.call('onStepHit', []);
+			}
+		}
+		#end
+		if(previousLevel != null) Paths.setCurrentLevel(previousLevel);
+		else Paths.setCurrentLevel('shared');
 	}
 
 	var ghostAlpha:Float = 0.6;

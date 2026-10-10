@@ -244,7 +244,7 @@ class LuaUtils
 		switch(objectName)
 		{
 			case 'this' | 'instance' | 'game':
-				return PlayState.instance;
+				return getTargetInstance();
 			
 			default:
 				var obj:Dynamic = MusicBeatState.getVariables().get(objectName);
@@ -267,8 +267,10 @@ class LuaUtils
 	
 	public static function getTargetInstance()
 	{
-		if(PlayState.instance != null) return PlayState.instance.isDead ? GameOverSubstate.instance : PlayState.instance;
-		return MusicBeatState.getState();
+		var state = MusicBeatState.getState();
+		if(Std.isOfType(state, PlayState) && PlayState.instance != null)
+			return PlayState.instance.isDead ? GameOverSubstate.instance : PlayState.instance;
+		return state;
 	}
 
 	public static inline function getLowestCharacterGroup():FlxSpriteGroup
