@@ -315,7 +315,13 @@ class MusicBeatState extends FlxState
 		if(nextState == null) nextState = FlxG.state;
 		#if (MODS_ALLOWED && (LUA_ALLOWED || HSCRIPT_ALLOWED))
 		if (nextState != FlxG.state)
+		{
+			var requestedName:String = Type.getClassName(Type.getClass(nextState));
 			nextState = StateScriptManager.resolveState(nextState);
+			var resolvedName:String = Type.getClassName(Type.getClass(nextState));
+			if (requestedName != resolvedName)
+				trace('[MusicBeatState] state switch ' + requestedName + ' -> ' + resolvedName);
+		}
 		#end
 		if(nextState == FlxG.state)
 		{
