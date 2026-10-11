@@ -7,6 +7,8 @@ import flixel.util.FlxSpriteUtil;
 import flixel.util.FlxStringUtil;
 import flixel.util.FlxDestroyUtil;
 import flixel.input.keyboard.FlxKey;
+import flixel.input.mouse.FlxMouseButton;
+import flixel.input.mouse.FlxMouseButtonID;
 
 import lime.utils.Assets;
 import lime.media.AudioBuffer;
@@ -203,6 +205,20 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 	var bg:FlxSprite;
 	var theme:ChartingTheme = DEFAULT;
+
+	var touchpadMode:Bool = false;
+	var touchpadModeButton:PsychUIButton;
+	var touchpadCursor:FlxSprite;
+	var touchpadTouch:Dynamic = null;
+	var touchpadLastX:Float = 0;
+	var touchpadLastY:Float = 0;
+	var touchpadStartX:Float = 0;
+	var touchpadStartY:Float = 0;
+	var touchpadHoldTime:Float = 0;
+	var touchpadGestureMoved:Bool = false;
+	var touchpadMovedThisFrame:Bool = false;
+	var touchpadRightDown:Bool = false;
+	var touchpadLeftDown:Bool = false;
 
 	var copiedNotes:Array<Dynamic> = [];
 	var copiedEvents:Array<Dynamic> = [];
@@ -546,6 +562,12 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		fullTipText.screenCenter();
 		add(fullTipText);
 		addTouchPad('LEFT_FULL', 'CHART_EDITOR');
+
+		touchpadCursor = new FlxSprite().makeGraphic(10, 10, FlxColor.YELLOW);
+		touchpadCursor.cameras = [camUI];
+		touchpadCursor.scrollFactor.set();
+		touchpadCursor.visible = false;
+		add(touchpadCursor);
 		super.create();
 	}
 
@@ -779,6 +801,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 		var lastTime:Float = Conductor.songPosition;
 		outputAlpha = Math.max(0, outputAlpha - elapsed);
+		updateTouchpadMode(elapsed);
 		var holdingAlt:Bool = touchPad.buttonG.justPressed || FlxG.keys.pressed.ALT;
 		if(FlxG.sound.music != null)
 		{
@@ -1237,10 +1260,10 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 				selectionBox.visible = false;
 				addUndoAction(SELECT_NOTE, {old: sel, current: selectedNotes.copy()});
 			}
-			else if(FlxG.mouse.justMoved)
+			else if(FlxG.mouse.justMoved || touchpadMovedThisFrame)
 				updateSelectionBox();
 		}
-		else if(FlxG.mouse.pressedRight && (FlxG.mouse.deltaScreenX != 0 || FlxG.mouse.deltaScreenY != 0))
+		else if(FlxG.mouse.pressedRight && (FlxG.mouse.deltaScreenX != 0 || FlxG.mouse.deltaScreenY != 0 || touchpadMovedThisFrame))
 		{
 			selectionBox.setPosition(FlxG.mouse.screenX, FlxG.mouse.screenY);
 			selectionStart.set(FlxG.mouse.screenX, FlxG.mouse.screenY);
@@ -1251,7 +1274,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var minX:Float = gridBg.x;
 		if(SHOW_EVENT_COLUMN && lockedEvents) minX += GRID_SIZE;
 
-		if (controls.mobileC)
+		if (controls.mobileC && !touchpadMode)
 		{
 			for (touch in FlxG.touches.list)
 			{
@@ -4319,6 +4342,85 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	}
 
 	var lockedEvents:Bool = false;
+	function updateTouchpadMode(elapsed:Float):Void
+	{
+		touchpadMovedThisFrame = false;
+		if(!touchpadMode) return;
+
+		if(touchpadLeftDown)
+		{
+			FlxMouseButton.getByID(FlxMouseButtonID.LEFT).release();
+			touchpadLeftDown = false;
+		}
+
+		if(touchpadTouch == null)
+		{
+			for(touch in FlxG.touches.list)
+			{
+				if(touch.justPressed)
+				{
+					touchpadTouch = touch;
+					touchpadLastX = touch.x;
+					touchpadLastY = touch.y;
+					touchpadStartX = touch.x;
+					touchpadStartY = touch.y;
+					touchpadHoldTime = 0;
+					touchpadGestureMoved = false;
+					break;
+				}
+			}
+		}
+
+		if(touchpadTouch != null)
+		{
+			if(touchpadTouch.pressed)
+			{
+				var dx:Float = touchpadTouch.x - touchpadLastX;
+				var dy:Float = touchpadTouch.y - touchpadLastY;
+				if(dx != 0 || dy != 0)
+				{
+					var totalDX:Float = touchpadTouch.x - touchpadStartX;
+					var totalDY:Float = touchpadTouch.y - touchpadStartY;
+					if(totalDX * totalDX + totalDY * totalDY >= 9) touchpadGestureMoved = true;
+					FlxG.mouse.setPosition(
+						FlxMath.bound(FlxG.mouse.x + dx * 1.35, 0, FlxG.width - 1),
+						FlxMath.bound(FlxG.mouse.y + dy * 1.35, 0, FlxG.height - 1)
+					);
+					touchpadMovedThisFrame = true;
+					touchpadLastX = touchpadTouch.x;
+					touchpadLastY = touchpadTouch.y;
+				}
+
+				touchpadHoldTime += elapsed;
+				if(touchpadHoldTime >= 0.45)
+				{
+					touchpadRightDown = true;
+					FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).press();
+				}
+			}
+			else if(touchpadTouch.justReleased)
+			{
+				if(touchpadRightDown)
+				{
+					FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).release();
+					touchpadRightDown = false;
+				}
+				else if(!touchpadGestureMoved)
+				{
+					FlxMouseButton.getByID(FlxMouseButtonID.LEFT).press();
+					touchpadLeftDown = true;
+				}
+				touchpadTouch = null;
+			}
+		}
+
+		if(touchpadCursor != null)
+		{
+			touchpadCursor.visible = true;
+			touchpadCursor.setPosition(FlxG.mouse.screenX - 5, FlxG.mouse.screenY - 5);
+		}
+	}
+
 	function addEditTab()
 	{
 		var tab = upperBox.getTab('Edit');
@@ -4335,6 +4437,26 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var btn:PsychUIButton = new PsychUIButton(btnX, btnY, '  Redo', redo, btnWid);
 		btn.text.alignment = LEFT;
 		tab_group.add(btn);
+
+		btnY++;
+		btnY += 20;
+		touchpadModeButton = new PsychUIButton(btnX, btnY, '  Touchpad Mode: OFF', function()
+		{
+			touchpadMode = !touchpadMode;
+			touchpadModeButton.text.text = touchpadMode ? '  Touchpad Mode: ON' : '  Touchpad Mode: OFF';
+			if(touchpadMode) FlxG.mouse.setPosition(FlxG.width / 2, FlxG.height / 2);
+			if(touchpadCursor != null) touchpadCursor.visible = touchpadMode;
+			if(!touchpadMode)
+			{
+				if(touchpadRightDown) FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).release();
+				if(touchpadLeftDown) FlxMouseButton.getByID(FlxMouseButtonID.LEFT).release();
+				touchpadRightDown = false;
+				touchpadLeftDown = false;
+				touchpadTouch = null;
+			}
+		}, btnWid);
+		touchpadModeButton.text.alignment = LEFT;
+		tab_group.add(touchpadModeButton);
 
 		btnY++;
 		btnY += 20;
