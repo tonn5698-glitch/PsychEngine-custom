@@ -92,8 +92,10 @@ class StateScriptManager
 		configLoaded = true;
 		#if MODS_ALLOWED
 		var candidates:Array<String> = [];
-		for (mod in Mods.parseList().enabled) if (!candidates.contains(mod)) candidates.push(mod);
-		for (mod in Mods.getModDirectories()) if (!candidates.contains(mod)) candidates.push(mod);
+		// Only load state config from the active mod. Never let another installed
+		// mod override the game's states just because its files exist on disk.
+		var activeMod:String = Mods.currentModDirectory;
+		if (activeMod != null && activeMod.length > 0) candidates.push(activeMod);
 		for (mod in candidates)
 		{
 			var base:String = findModDir(mod);
@@ -151,9 +153,11 @@ class StateScriptManager
 			fileName += ".hx";
 
 		var mods:Array<String> = [];
+		// State overrides are mod-local. Prefer the registered owner, otherwise
+		// resolve only against the currently active mod instead of scanning all mods.
 		if (preferredMod != null && preferredMod.length > 0) mods.push(preferredMod);
-		for (mod in Mods.parseList().enabled) if (!mods.contains(mod)) mods.push(mod);
-		for (mod in Mods.getModDirectories()) if (!mods.contains(mod)) mods.push(mod);
+		else if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
+			mods.push(Mods.currentModDirectory);
 		for (mod in mods)
 		{
 			var base:String = findModDir(mod);

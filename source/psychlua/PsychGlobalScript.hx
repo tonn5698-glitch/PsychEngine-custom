@@ -37,35 +37,29 @@ class PsychGlobalScript
 			}
 		}
 
-		// 2) Scan mods
-		for (mod in Mods.getModDirectories())
-		{
-			var modPath:String = Paths.mods(mod + '/customStates/global/');
-			if (sys.FileSystem.exists(modPath))
-			{
-				if (!loadedPaths.contains(modPath))
-				{
-					loadFolder(modPath);
-					loadedPaths.push(modPath);
-				}
-			}
-		}
-		// Also support Codename-style global entry points in the active mod's data folder.
+		// 2) Scan ONLY the currently active mod.
+		// Do not scan every enabled/installed mod: a global script must belong
+		// to the mod that is actually running.
 		#if MODS_ALLOWED
-		var candidates:Array<String> = [];
-		for (mod in Mods.parseList().enabled) if (!candidates.contains(mod)) candidates.push(mod);
-		for (mod in Mods.getModDirectories()) if (!candidates.contains(mod)) candidates.push(mod);
-		for (mod in candidates)
+		var activeMod:String = Mods.currentModDirectory;
+		if (activeMod != null && activeMod.length > 0)
 		{
+			var modPath:String = Paths.mods(activeMod + '/customStates/global/');
+			if (sys.FileSystem.exists(modPath) && !loadedPaths.contains(modPath))
+			{
+				loadFolder(modPath);
+				loadedPaths.push(modPath);
+			}
+
 			for (root in Paths.modRootDirs)
 			{
-				var base:String = Paths.modsRootByName(root) + mod + '/data/';
+				var base:String = Paths.modsRootByName(root) + activeMod + '/data/';
 				for (name in ['global.hx', 'global.lua'])
 				{
 					var file:String = base + name;
 					if (sys.FileSystem.exists(file) && !loadedPaths.contains(file))
 					{
-						loadGlobalFile(file, mod);
+						loadGlobalFile(file, activeMod);
 						loadedPaths.push(file);
 					}
 				}
