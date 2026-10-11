@@ -1,6 +1,7 @@
 package states;
 
 import objects.VideoSprite;
+import mobile.backend.TouchUtil;
 #if android
 import mobile.backend.PsychJNI;
 import openfl.utils.Assets as OpenFlAssets;
@@ -113,6 +114,19 @@ class IntroState extends MusicBeatState
 		#if sys dbg('[IntroState] VIDEOS_ALLOWED = NO'); #end
 		if (skipTitle) goToMenu(); else goToTitle();
 		#end
+	}
+
+	// Allow the engine intro to be skipped with a tap or a key press.
+	// VideoSprite's built-in skip only checks Controls.accept, which can be
+	// unavailable on mobile builds; the end callback may also fail to arrive.
+	override public function update(elapsed:Float):Void
+	{
+		if (!goingToTitle && (FlxG.keys.justPressed.ENTER || FlxG.keys.justPressed.SPACE || FlxG.keys.justPressed.ESCAPE || FlxG.mouse.justPressed || TouchUtil.justPressed))
+		{
+			goToTitle();
+			return;
+		}
+		super.update(elapsed);
 	}
 
 	function getVideoFile():String
