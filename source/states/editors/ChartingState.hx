@@ -8,7 +8,7 @@ import flixel.util.FlxStringUtil;
 import flixel.util.FlxDestroyUtil;
 import flixel.input.keyboard.FlxKey;
 import flixel.input.mouse.FlxMouseButton;
-import flixel.input.mouse.FlxMouseButtonID;
+import flixel.input.mouse.FlxMouseButton.FlxMouseButtonID;
 
 import lime.utils.Assets;
 import lime.media.AudioBuffer;
@@ -4382,7 +4382,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 					var totalDX:Float = touchpadTouch.x - touchpadStartX;
 					var totalDY:Float = touchpadTouch.y - touchpadStartY;
 					if(totalDX * totalDX + totalDY * totalDY >= 9) touchpadGestureMoved = true;
-					FlxG.mouse.setPosition(
+					FlxG.mouse.inlinesetGlobalScreenPositionUnsafe(
 						FlxMath.bound(FlxG.mouse.x + dx * 1.35, 0, FlxG.width - 1),
 						FlxMath.bound(FlxG.mouse.y + dy * 1.35, 0, FlxG.height - 1)
 					);
@@ -4444,7 +4444,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		{
 			touchpadMode = !touchpadMode;
 			touchpadModeButton.text.text = touchpadMode ? '  Touchpad Mode: ON' : '  Touchpad Mode: OFF';
-			if(touchpadMode) FlxG.mouse.setPosition(FlxG.width / 2, FlxG.height / 2);
+			if(touchpadMode) FlxG.mouse.inlinesetGlobalScreenPositionUnsafe(FlxG.width / 2, FlxG.height / 2);
 			if(touchpadCursor != null) touchpadCursor.visible = touchpadMode;
 			if(!touchpadMode)
 			{
