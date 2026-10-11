@@ -43,36 +43,6 @@ class MainMenuState extends MusicBeatState
 
 	static var showOutdatedWarning:Bool = true;
 
-	// ===== AUTO-SCAN MOD STATES =====
-	// Quét data/states/ trong tất cả mod → trả về danh sách state
-	public static function scanModStates():Array<{name:String, mod:String}>
-	{
-		var result:Array<{name:String, mod:String}> = [];
-		#if MODS_ALLOWED
-		// Chỉ scan state của mod đang ENABLED. Mod disabled vẫn tồn tại trên disk
-		// nên getModDirectories() một mình sẽ khiến state của mod đã tắt vẫn bị chạy.
-		var enabledMods:Array<String> = Mods.parseList().enabled;
-		for (mod in enabledMods)
-		{
-			var dir:String = Paths.mods(mod + '/data/states/');
-			if (FileSystem.exists(dir))
-			{
-				var files:Array<String> = FileSystem.readDirectory(dir);
-				for (file in files)
-				{
-					var ext:String = Path.extension(file).toLowerCase();
-					if (ext == 'hx' || ext == 'hscript' || ext == 'lua')
-					{
-						var name:String = Path.withoutExtension(file);
-						result.push({name: name, mod: mod});
-					}
-				}
-			}
-		}
-		#end
-		return result;
-	}
-
 	override function create()
 	{
 		super.create();
@@ -280,25 +250,8 @@ class MainMenuState extends MusicBeatState
 						case 'story_mode':
 							MusicBeatState.switchState(new StoryMenuState());
 						case 'freeplay':
-							// ===== AUTO-SCAN MOD STATES =====
-							var states:Array<{name:String, mod:String}> = scanModStates();
-							if (states.length == 0)
-							{
-								// Không có mod nào có state → dùng Freeplay mặc định
-								MusicBeatState.switchState(new FreeplayState());
-							}
-							else if (states.length == 1)
-							{
-								// Chỉ có 1 mod có state → dùng luôn
-								trace('[MainMenu] Dùng state "' + states[0].name + '" từ mod "' + states[0].mod + '"');
-								MusicBeatState.switchState(new funkin.backend.scripting.ModState(states[0].name));
-							}
-							else
-							{
-								// Nhiều mod có state → hiện chọn
-								trace('[MainMenu] Phát hiện ' + states.length + ' states, mở chọn');
-								MusicBeatState.switchState(new FreeplaySelectState(states));
-							}
+							// Let global.hx / StateScriptManager apply the active mod's override.
+							MusicBeatState.switchState(new FreeplayState());
 
 						#if MODS_ALLOWED
 						case 'mods':
@@ -365,91 +318,5 @@ class MainMenuState extends MusicBeatState
 		selectedItem.animation.play('selected');
 		selectedItem.centerOffsets();
 		camFollow.y = selectedItem.getGraphicMidpoint().y;
-	}
-}
-
-// ===== FREEPLAY SELECT STATE =====
-// Hiện khi 2+ mod có state → chọn 1
-class FreeplaySelectState extends MusicBeatState
-{
-	var states:Array<{name:String, mod:String}>;
-	var curSelected:Int = 0;
-	var items:Array<FlxText> = [];
-	var title:FlxText;
-
-	public function new(states:Array<{name:String, mod:String}>)
-	{
-		super();
-		this.states = states;
-	}
-
-	override function create()
-	{
-		super.create();
-		FlxG.camera.bgColor = 0xFF000000;
-
-		var bg:FlxSprite = new FlxSprite(-80).loadGraphic(Paths.image('menuDesat'));
-		bg.antialiasing = ClientPrefs.data.antialiasing;
-		bg.scrollFactor.set(0, 0.25);
-		bg.setGraphicSize(Std.int(Math.max(bg.width * 1.175, FlxG.width)), 0);
-		bg.updateHitbox();
-		bg.screenCenter();
-		bg.alpha = 0.5;
-		add(bg);
-
-		title = new FlxText(0, 30, FlxG.width, 'PHÁT HIỆN ' + states.length + ' MOD STATE', 32);
-		title.setFormat(Paths.font("vcr.ttf"), 32, 0xFFFF0000, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		title.scrollFactor.set();
-		add(title);
-
-		for (i in 0...states.length)
-		{
-			var txt:FlxText = new FlxText(0, 100 + i * 50, FlxG.width,
-				states[i].mod + ' → ' + states[i].name, 24);
-			txt.setFormat(Paths.font("vcr.ttf"), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-			txt.scrollFactor.set();
-			add(txt);
-			items.push(txt);
-		}
-
-		var hint:FlxText = new FlxText(0, FlxG.height - 60, FlxG.width,
-			'UP/DOWN để chọn • ACCEPT để vào • BACK để quay lại', 16);
-		hint.setFormat(Paths.font("vcr.ttf"), 16, 0xFFAAAAAA, CENTER);
-		hint.scrollFactor.set();
-		add(hint);
-
-		highlight();
-	}
-
-	function highlight()
-	{
-		for (i in 0...items.length)
-		{
-			if (i == curSelected)
-				items[i].color = 0xFFFFFF00;
-			else
-				items[i].color = FlxColor.WHITE;
-		}
-	}
-
-	override function update(elapsed:Float)
-	{
-		super.update(elapsed);
-
-		if (controls.UI_UP_P) { curSelected--; if (curSelected < 0) curSelected = items.length - 1; highlight(); FlxG.sound.play(Paths.sound('scrollMenu')); }
-		if (controls.UI_DOWN_P) { curSelected++; if (curSelected >= items.length) curSelected = 0; highlight(); FlxG.sound.play(Paths.sound('scrollMenu')); }
-
-		if (controls.ACCEPT)
-		{
-			FlxG.sound.play(Paths.sound('confirmMenu'));
-			trace('[MainMenu] Chọn state "' + states[curSelected].name + '" từ mod "' + states[curSelected].mod + '"');
-			MusicBeatState.switchState(new funkin.backend.scripting.ModState(states[curSelected].name));
-		}
-
-		if (controls.BACK)
-		{
-			FlxG.sound.play(Paths.sound('cancelMenu'));
-			MusicBeatState.switchState(new MainMenuState());
-		}
 	}
 }
