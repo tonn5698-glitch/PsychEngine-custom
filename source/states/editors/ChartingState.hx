@@ -237,6 +237,11 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var vortexEnabled:Bool = false;
 	var waveformEnabled:Bool = false;
 	var waveformTarget:WaveformTarget = INST;
+	var visualizerBars:Array<FlxSprite> = [];
+	var visualizerLevels:Array<Float> = [];
+	var visualizerElapsed:Float = 0;
+	var visualizerBuffer:AudioBuffer;
+	var visualizerBytes:Bytes;
 
 	override function create()
 	{
@@ -404,7 +409,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		infoBox.getTab('Information').menu.add(infoText);
 		add(infoBox);
 
-		mainBox = new PsychUIBox(mainBoxPosition.x, mainBoxPosition.y, 300, 280, ['Charting', 'Data', 'Events', 'Note', 'Section', 'Song']);
+		mainBox = new PsychUIBox(mainBoxPosition.x, mainBoxPosition.y, 300, 280, ['Charting', 'Data', 'Events', 'Note', 'Section', 'Song', 'Visualizer']);
 		mainBox.selectedName = 'Song';
 		mainBox.scrollFactor.set();
 		mainBox.cameras = [camUI];
@@ -456,6 +461,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		addNoteTab();
 		addSectionTab();
 		addSongTab();
+		addVisualizerTab();
 		
 		////// for upper box
 		addFileTab();
@@ -832,6 +838,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var lastTime:Float = Conductor.songPosition;
 		outputAlpha = Math.max(0, outputAlpha - elapsed);
 		updateTouchpadMode(elapsed);
+		updateVisualizer(elapsed);
 		var holdingAlt:Bool = touchPad.buttonG.justPressed || FlxG.keys.pressed.ALT;
 		if(FlxG.sound.music != null)
 		{
@@ -2675,6 +2682,108 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var playerMuteCheckBox:PsychUICheckBox;
 	var opponentVolumeStepper:PsychUINumericStepper;
 	var opponentMuteCheckBox:PsychUICheckBox;
+	function addVisualizerTab()
+	{
+		var tab_group = mainBox.getTab('Visualizer').menu;
+		var title:FlxText = new FlxText(10, 12, 280, 'LIVE AUDIO SPECTRUM');
+		title.setFormat(null, 14, FlxColor.WHITE, CENTER);
+		tab_group.add(title);
+
+		var hint:FlxText = new FlxText(10, 32, 280, 'Play the song to see the bars move');
+		hint.setFormat(null, 10, FlxColor.GRAY, CENTER);
+		tab_group.add(hint);
+
+		var barCount:Int = 32;
+		var barWidth:Float = 7;
+		var barGap:Float = 1;
+		var baseY:Float = 235;
+		for (i in 0...barCount)
+		{
+			var bar:FlxSprite = new FlxSprite(10 + i * (barWidth + barGap), baseY).makeGraphic(1, 1, FlxColor.CYAN);
+			bar.scale.set(barWidth, 2);
+			bar.updateHitbox();
+			bar.cameras = [camUI];
+			tab_group.add(bar);
+			visualizerBars.push(bar);
+			visualizerLevels.push(0);
+		}
+	}
+
+	function updateVisualizer(elapsed:Float)
+	{
+		if (mainBox == null || mainBox.selectedName != 'Visualizer') return;
+		visualizerElapsed += elapsed;
+		if (visualizerElapsed < 0.04) return;
+		visualizerElapsed = 0;
+
+		var sound:FlxSound = FlxG.sound.music;
+		var levels:Array<Float> = [];
+		for (i in 0...visualizerBars.length) levels.push(0);
+
+		#if (lime_cffi && !macro)
+		@:privateAccess
+		if (sound != null && sound.playing && sound._sound != null && sound._sound.__buffer != null)
+		{
+			var buffer:AudioBuffer = sound._sound.__buffer;
+			if (buffer.data != null && buffer.sampleRate > 0 && buffer.channels > 0)
+			{
+				if (visualizerBuffer != buffer || visualizerBytes == null)
+				{
+					visualizerBuffer = buffer;
+					visualizerBytes = buffer.data.toBytes();
+				}
+				var bytes:Bytes = visualizerBytes;
+				var sampleRate:Int = buffer.sampleRate;
+				var channels:Int = buffer.channels;
+				var windowSize:Int = 1024;
+				var startFrame:Int = Std.int((sound.time / 1000) * sampleRate);
+				var maxFrame:Int = Std.int(bytes.length / (channels * 2));
+				var minFreq:Float = 65;
+				var maxFreq:Float = Math.min(9000, sampleRate * 0.45);
+				for (i in 0...visualizerBars.length)
+				{
+					var fraction:Float = i / (visualizerBars.length - 1);
+					var frequency:Float = minFreq * Math.pow(maxFreq / minFreq, fraction);
+					var bin:Int = Std.int(Math.max(1, Math.round(frequency * windowSize / sampleRate)));
+					var omega:Float = 2 * Math.PI * bin / windowSize;
+					var coeff:Float = 2 * Math.cos(omega);
+					var q1:Float = 0;
+					var q2:Float = 0;
+					for (j in 0...windowSize)
+					{
+						var frame:Int = startFrame + j;
+						if (frame < 0 || frame >= maxFrame) break;
+						var sampleSum:Float = 0;
+						for (channel in 0...channels)
+						{
+							var sample:Int = bytes.getUInt16((frame * channels + channel) * 2);
+							if (sample > 32767) sample -= 65536;
+							sampleSum += sample / 32768;
+						}
+						var sampleValue:Float = sampleSum / channels;
+						var q0:Float = coeff * q1 - q2 + sampleValue;
+						q2 = q1;
+						q1 = q0;
+					}
+					var power:Float = Math.max(0, q1 * q1 + q2 * q2 - coeff * q1 * q2);
+					levels[i] = Math.min(1, Math.sqrt(power) * 2 / windowSize);
+				}
+			}
+		}
+		#end
+
+		for (i in 0...visualizerBars.length)
+		{
+			var target:Float = levels[i] * 105;
+			visualizerLevels[i] = target > visualizerLevels[i] ? target : visualizerLevels[i] * 0.72;
+			var height:Float = Math.max(2, visualizerLevels[i]);
+			var bar:FlxSprite = visualizerBars[i];
+			bar.scale.y = height;
+			bar.y = 235 - height;
+			bar.updateHitbox();
+		}
+	}
+
 	function addChartingTab()
 	{
 		var tab_group = mainBox.getTab('Charting').menu;
