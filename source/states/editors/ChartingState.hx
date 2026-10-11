@@ -208,17 +208,23 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 	var touchpadMode:Bool = false;
 	var touchpadModeButton:PsychUIButton;
+	var touchpadLeftButtonToggle:PsychUIButton;
+	var touchpadRightButtonToggle:PsychUIButton;
+	var touchpadLeftClickEnabled:Bool = false;
+	var touchpadRightClickEnabled:Bool = false;
+	var touchpadLeftClickSprite:FlxSprite;
+	var touchpadRightClickSprite:FlxSprite;
+	var touchpadLeftClickLabel:FlxText;
+	var touchpadRightClickLabel:FlxText;
+	var touchpadClickTouch:Dynamic = null;
+	var touchpadClickIsRight:Bool = false;
+	var touchpadReleaseClickNextFrame:Bool = false;
 	var touchpadCursor:FlxSprite;
 	var touchpadTouch:Dynamic = null;
 	var touchpadLastX:Float = 0;
 	var touchpadLastY:Float = 0;
-	var touchpadStartX:Float = 0;
 	var touchpadStartY:Float = 0;
-	var touchpadHoldTime:Float = 0;
-	var touchpadGestureMoved:Bool = false;
 	var touchpadMovedThisFrame:Bool = false;
-	var touchpadRightDown:Bool = false;
-	var touchpadLeftDown:Bool = false;
 
 	var copiedNotes:Array<Dynamic> = [];
 	var copiedEvents:Array<Dynamic> = [];
@@ -568,6 +574,30 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		touchpadCursor.scrollFactor.set();
 		touchpadCursor.visible = false;
 		add(touchpadCursor);
+
+		touchpadLeftClickSprite = new FlxSprite(FlxG.width * 0.5 - 38, FlxG.height - 104).makeGraphic(76, 76, 0xBB303030);
+		touchpadLeftClickSprite.cameras = [camUI];
+		touchpadLeftClickSprite.scrollFactor.set();
+		touchpadLeftClickSprite.visible = false;
+		add(touchpadLeftClickSprite);
+		touchpadLeftClickLabel = new FlxText(touchpadLeftClickSprite.x, touchpadLeftClickSprite.y + 22, 76, 'LEFT', 16);
+		touchpadLeftClickLabel.setFormat(null, 16, FlxColor.WHITE, CENTER);
+		touchpadLeftClickLabel.cameras = [camUI];
+		touchpadLeftClickLabel.scrollFactor.set();
+		touchpadLeftClickLabel.visible = false;
+		add(touchpadLeftClickLabel);
+
+		touchpadRightClickSprite = new FlxSprite(18, FlxG.height - 104).makeGraphic(76, 76, 0xBB303030);
+		touchpadRightClickSprite.cameras = [camUI];
+		touchpadRightClickSprite.scrollFactor.set();
+		touchpadRightClickSprite.visible = false;
+		add(touchpadRightClickSprite);
+		touchpadRightClickLabel = new FlxText(touchpadRightClickSprite.x, touchpadRightClickSprite.y + 22, 76, 'RIGHT', 16);
+		touchpadRightClickLabel.setFormat(null, 16, FlxColor.WHITE, CENTER);
+		touchpadRightClickLabel.cameras = [camUI];
+		touchpadRightClickLabel.scrollFactor.set();
+		touchpadRightClickLabel.visible = false;
+		add(touchpadRightClickLabel);
 		super.create();
 	}
 
@@ -4345,32 +4375,73 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	function updateTouchpadMode(elapsed:Float):Void
 	{
 		touchpadMovedThisFrame = false;
-		if(!touchpadMode) return;
-
-		if(touchpadLeftDown)
+		if(!touchpadMode)
 		{
-			FlxMouseButton.getByID(FlxMouseButtonID.LEFT).release();
-			touchpadLeftDown = false;
+			if(touchpadLeftClickSprite != null) touchpadLeftClickSprite.visible = false;
+			if(touchpadRightClickSprite != null) touchpadRightClickSprite.visible = false;
+			if(touchpadLeftClickLabel != null) touchpadLeftClickLabel.visible = false;
+			if(touchpadRightClickLabel != null) touchpadRightClickLabel.visible = false;
+			return;
 		}
+
+		if(touchpadReleaseClickNextFrame)
+		{
+			FlxMouseButton.getByID(touchpadClickIsRight ? FlxMouseButtonID.RIGHT : FlxMouseButtonID.LEFT).release();
+			touchpadReleaseClickNextFrame = false;
+		}
+		else
+		{
+			// Touches used to move the cursor must never become mouse clicks.
+			FlxMouseButton.getByID(FlxMouseButtonID.LEFT).release();
+			FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).release();
+		}
+
+		if(touchpadLeftClickSprite != null)
+		{
+			touchpadLeftClickSprite.visible = touchpadLeftClickEnabled;
+			touchpadRightClickSprite.visible = touchpadRightClickEnabled;
+			touchpadLeftClickLabel.visible = touchpadLeftClickEnabled;
+			touchpadRightClickLabel.visible = touchpadRightClickEnabled;
+		}
+
+		if(touchpadClickTouch == null)
+		{
+			for(touch in FlxG.touches.list)
+			{
+				if(!touch.justPressed) continue;
+				if(touchpadLeftClickEnabled && touch.overlaps(touchpadLeftClickSprite))
+				{
+					touchpadClickTouch = touch;
+					touchpadClickIsRight = false;
+					FlxMouseButton.getByID(FlxMouseButtonID.LEFT).press();
+					touchpadReleaseClickNextFrame = true;
+					break;
+				}
+				if(touchpadRightClickEnabled && touch.overlaps(touchpadRightClickSprite))
+				{
+					touchpadClickTouch = touch;
+					touchpadClickIsRight = true;
+					FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).press();
+					touchpadReleaseClickNextFrame = true;
+					break;
+				}
+			}
+		}
+		if(touchpadClickTouch != null && !touchpadClickTouch.pressed) touchpadClickTouch = null;
 
 		if(touchpadTouch == null)
 		{
 			for(touch in FlxG.touches.list)
 			{
-				if(touch.justPressed)
+				if(touch.justPressed && !(touchpadLeftClickEnabled && touch.overlaps(touchpadLeftClickSprite)) && !(touchpadRightClickEnabled && touch.overlaps(touchpadRightClickSprite)))
 				{
 					touchpadTouch = touch;
 					touchpadLastX = touch.x;
 					touchpadLastY = touch.y;
-					touchpadStartX = touch.x;
-					touchpadStartY = touch.y;
-					touchpadHoldTime = 0;
-					touchpadGestureMoved = false;
 					break;
 				}
 			}
 		}
-
 		if(touchpadTouch != null)
 		{
 			if(touchpadTouch.pressed)
@@ -4379,9 +4450,6 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 				var dy:Float = touchpadTouch.y - touchpadLastY;
 				if(dx != 0 || dy != 0)
 				{
-					var totalDX:Float = touchpadTouch.x - touchpadStartX;
-					var totalDY:Float = touchpadTouch.y - touchpadStartY;
-					if(totalDX * totalDX + totalDY * totalDY >= 9) touchpadGestureMoved = true;
 					FlxG.mouse.setGlobalScreenPositionUnsafe(
 						FlxMath.bound(FlxG.mouse.x + dx * 1.35, 0, FlxG.width - 1),
 						FlxMath.bound(FlxG.mouse.y + dy * 1.35, 0, FlxG.height - 1)
@@ -4390,30 +4458,9 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 					touchpadLastX = touchpadTouch.x;
 					touchpadLastY = touchpadTouch.y;
 				}
-
-				touchpadHoldTime += elapsed;
-				if(touchpadHoldTime >= 0.45)
-				{
-					touchpadRightDown = true;
-					FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).press();
-				}
 			}
-			else if(touchpadTouch.justReleased)
-			{
-				if(touchpadRightDown)
-				{
-					FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).release();
-					touchpadRightDown = false;
-				}
-				else if(!touchpadGestureMoved)
-				{
-					FlxMouseButton.getByID(FlxMouseButtonID.LEFT).press();
-					touchpadLeftDown = true;
-				}
-				touchpadTouch = null;
-			}
+			else if(touchpadTouch.justReleased) touchpadTouch = null;
 		}
-
 		if(touchpadCursor != null)
 		{
 			touchpadCursor.visible = true;
@@ -4446,17 +4493,39 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			touchpadModeButton.text.text = touchpadMode ? '  Touchpad Mode: ON' : '  Touchpad Mode: OFF';
 			if(touchpadMode) FlxG.mouse.setGlobalScreenPositionUnsafe(FlxG.width / 2, FlxG.height / 2);
 			if(touchpadCursor != null) touchpadCursor.visible = touchpadMode;
+			if(touchpadLeftClickSprite != null) touchpadLeftClickSprite.visible = touchpadMode && touchpadLeftClickEnabled;
+			if(touchpadRightClickSprite != null) touchpadRightClickSprite.visible = touchpadMode && touchpadRightClickEnabled;
+			if(touchpadLeftClickLabel != null) touchpadLeftClickLabel.visible = touchpadMode && touchpadLeftClickEnabled;
+			if(touchpadRightClickLabel != null) touchpadRightClickLabel.visible = touchpadMode && touchpadRightClickEnabled;
 			if(!touchpadMode)
 			{
-				if(touchpadRightDown) FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).release();
-				if(touchpadLeftDown) FlxMouseButton.getByID(FlxMouseButtonID.LEFT).release();
-				touchpadRightDown = false;
-				touchpadLeftDown = false;
+				FlxMouseButton.getByID(FlxMouseButtonID.RIGHT).release();
+				FlxMouseButton.getByID(FlxMouseButtonID.LEFT).release();
+				touchpadReleaseClickNextFrame = false;
+				touchpadClickTouch = null;
 				touchpadTouch = null;
 			}
 		}, btnWid);
 		touchpadModeButton.text.alignment = LEFT;
 		tab_group.add(touchpadModeButton);
+
+		btnY += 20;
+		touchpadLeftButtonToggle = new PsychUIButton(btnX, btnY, '  Left Click Button: OFF', function()
+		{
+			touchpadLeftClickEnabled = !touchpadLeftClickEnabled;
+			touchpadLeftButtonToggle.text.text = touchpadLeftClickEnabled ? '  Left Click Button: ON' : '  Left Click Button: OFF';
+		}, btnWid);
+		touchpadLeftButtonToggle.text.alignment = LEFT;
+		tab_group.add(touchpadLeftButtonToggle);
+
+		btnY += 20;
+		touchpadRightButtonToggle = new PsychUIButton(btnX, btnY, '  Right Click Button: OFF', function()
+		{
+			touchpadRightClickEnabled = !touchpadRightClickEnabled;
+			touchpadRightButtonToggle.text.text = touchpadRightClickEnabled ? '  Right Click Button: ON' : '  Right Click Button: OFF';
+		}, btnWid);
+		touchpadRightButtonToggle.text.alignment = LEFT;
+		tab_group.add(touchpadRightButtonToggle);
 
 		btnY++;
 		btnY += 20;
