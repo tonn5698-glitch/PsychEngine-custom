@@ -407,5 +407,38 @@ class CameraEditorState extends MusicBeatState
         if(info!=null)info.text='Saved camera events.';
     }
 
+    // Đọc lại chart từ đĩa, mất các thay đổi chưa Save
+    public function reloadChart()
+    {
+        if (Song.chartPath == null) return;
+        song = Song.parseJSON(File.getContent(Song.chartPath), Song.chartPath);
+        PlayState.SONG = song;
+        StageData.loadDirectory(song);
+        loadData();
+        undoStack = []; redoStack = [];
+        selected = -1; selectedMany = [];
+        makePreview(); refresh(); seek(0);
+        info.text = 'Reloaded chart from disk.';
+    }
+
+    // Chỉ đọc lại events từ đĩa, giữ nguyên stage
+    public function reloadEvents()
+    {
+        if (Song.chartPath == null) return;
+        var fresh = Song.parseJSON(File.getContent(Song.chartPath), Song.chartPath);
+        song.events = fresh.events;
+        loadData();
+        undoStack = []; redoStack = [];
+        selected = -1; selectedMany = [];
+        refresh(); evaluate(); seek(time);
+        info.text = 'Reloaded events from disk.';
+    }
+
+    public function reloadStage()
+    {
+        StageData.loadDirectory(song);
+        makePreview(); evaluate(); seek(time);
+    }
+
     function closeEditor(){if(preview!=null)FlxG.cameras.remove(preview);MusicBeatState.switchState(new MasterEditorMenu());}
 }
