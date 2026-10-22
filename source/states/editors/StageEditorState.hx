@@ -43,6 +43,16 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 	var UI_box:PsychUIBox;
 	var spriteList_box:PsychUIBox;
 	var stageSprites:Array<StageEditorMetaSprite> = [];
+	var dragCameraCheckbox:PsychUICheckBox;
+	var isDraggingCam:Bool = false;
+
+	#if LUA_ALLOWED
+	var stageLua:psychlua.FunkinLua = null;
+	var luaSpriteTags:Array<String> = [];
+	#end
+	var luaStepStepper:PsychUINumericStepper;
+	var loadLuaCheckbox:PsychUICheckBox;
+
 	public function new(stageToLoad:String = 'stage', cachedJson:StageFile = null)
 	{
 		lastLoadedStage = stageToLoad;
@@ -208,6 +218,11 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 				stageSprites.push(new StageEditorMetaSprite({type: character}, Reflect.field(this, character)));
 
 		updateSpriteListRadio();
+
+		#if LUA_ALLOWED
+		if(loadLuaCheckbox != null && loadLuaCheckbox.checked)
+			reloadStageLua();
+		#end
 	}
 
 	var spriteListRadioGroup:PsychUIRadioGroup;
@@ -565,6 +580,8 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 					nameList.push('- Boyfriend -');
 				case 'dad':
 					nameList.push('- Opponent -');
+				case 'lua':
+					nameList.push('[Lua] ' + spr.name);
 				default:
 					nameList.push(spr.name);
 			}
@@ -593,7 +610,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		add(UI_box);
 		UI_box.selectedName = 'Data';
 
-		UI_stagebox = new PsychUIBox(FlxG.width - 275, 25, 250, 100, ['Stage']);
+		UI_stagebox = new PsychUIBox(FlxG.width - 275, 25, 250, 120, ['Stage']);
 		UI_stagebox.cameras = [camHUD];
 		UI_stagebox.scrollFactor.set();
 		add(UI_stagebox);
@@ -639,7 +656,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 		directoryDropDown = new PsychUIDropDownMenu(objX, objY, folderList, function(sel:Int, selected:String) {
 			stageJson.directory = selected;
-			saveObjectsToJson();
+			saveObjectsToJson(false);
 			FlxTransitionableState.skipNextTransIn = FlxTransitionableState.skipNextTransOut = true;
 			MusicBeatState.switchState(new StageEditorState(lastLoadedStage, stageJson));
 		});
@@ -1165,10 +1182,31 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		});
 		reloadStageDropDown();
 
+		dragCameraCheckbox = new PsychUICheckBox(10, 70, 'Drag Camera (hold + drag)', 180);
 		tab_group.add(new FlxText(stageDropDown.x, stageDropDown.y - 18, 60, 'Stage:'));
 		tab_group.add(reloadStage);
 		tab_group.add(dummyStage);
 		tab_group.add(stageDropDown);
+		tab_group.add(dragCameraCheckbox);
+
+		#if LUA_ALLOWED
+		loadLuaCheckbox = new PsychUICheckBox(10, 95, 'Load Stage Lua', 150);
+		loadLuaCheckbox.onClick = function()
+		{
+			if(loadLuaCheckbox.checked) reloadStageLua();
+			else unloadStageLua();
+		};
+		tab_group.add(loadLuaCheckbox);
+
+		tab_group.add(new FlxText(180, 95, 50, 'Step:'));
+		luaStepStepper = new PsychUINumericStepper(220, 95, 1, 0, 0, 4096, 0, 60);
+		luaStepStepper.onValueChange = function()
+		{
+			if(loadLuaCheckbox != null && loadLuaCheckbox.checked)
+				reloadStageLua();
+		};
+		tab_group.add(luaStepStepper);
+		#end
 	}
 	
 	function updateStageDataUI()
@@ -1291,7 +1329,109 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		oppDropdown.selectedLabel = dad.curCharacter;
 		gfDropdown.selectedLabel = gf.curCharacter;
 		plDropdown.selectedLabel = boyfriend.curCharacter;
+
+		#if LUA_ALLOWED
+		if(loadLuaCheckbox != null && loadLuaCheckbox.checked)
+			reloadStageLua();
+		#end
 	}
+
+	#if LUA_ALLOWED
+	function unloadStageLua()
+	{
+		if(stageLua != null)
+		{
+			stageLua.call('onDestroy', []);
+			var allTags:Array<String> = luaSpriteTags.copy();
+			for(tag in stageLua.stagePreviewTags)
+				if(!allTags.contains(tag)) allTags.push(tag);
+			for(tag in allTags)
+			{
+				variables.remove(tag);
+				// xoá sprite khỏi stageSprites nếu nó là lua sprite
+				for(i in 0...stageSprites.length)
+					if(stageSprites[i] != null && stageSprites[i].type == 'lua' && stageSprites[i].name == tag)
+					{
+						if(stageSprites[i].sprite != null)
+						{
+							remove(stageSprites[i].sprite, true);
+							stageSprites[i].sprite.destroy();
+						}
+						stageSprites.splice(i, 1);
+						break;
+					}
+			}
+			luaSpriteTags = [];
+			stageLua.stop();
+			luaArray.remove(stageLua);
+			stageLua = null;
+			updateSpriteListRadio();
+		}
+	}
+
+	function reloadStageLua()
+	{
+		unloadStageLua();
+
+		var luaPath:String = Paths.getSharedPath('stages/' + lastLoadedStage + '.lua');
+		#if MODS_ALLOWED
+		var modLuaPath:String = Paths.modFolders('stages/' + lastLoadedStage + '.lua');
+		if(FileSystem.exists(modLuaPath)) luaPath = modLuaPath;
+		#end
+		#if sys
+		if(!FileSystem.exists(luaPath)) return;
+		#else
+		if(!Assets.exists(luaPath)) return;
+		#end
+
+		stageLua = new psychlua.FunkinLua(luaPath, true, lastLoadedStage);
+		// FunkinLua constructor đã tự push vào luaArray rồi
+		stageLua.call('onCreatePost', []);
+
+		// simulate steps nếu có stepper
+		var targetStep:Int = luaStepStepper != null ? Std.int(luaStepStepper.value) : 0;
+		if(targetStep > 0)
+		{
+			stageLua.stagePreviewSimulatingSteps = true;
+			for(step in 0...(targetStep + 1))
+			{
+				stageLua.set('curStep', step);
+				stageLua.set('curBeat', Std.int(step / 4));
+				stageLua.set('curSection', Std.int(step / 16));
+				stageLua.set('curDecStep', step);
+				stageLua.set('curDecBeat', step / 4);
+				if(step % 16 == 0) stageLua.call('onSectionHit', []);
+				if(step % 4 == 0) stageLua.call('onBeatHit', []);
+				stageLua.call('onStepHit', []);
+			}
+			stageLua.stagePreviewSimulatingSteps = false;
+		}
+	}
+
+	public function addStagePreviewLuaSprite(sprite:FlxSprite, inFront:Bool = false):Void
+	{
+		if(sprite == null) return;
+		// tìm tag từ variables
+		var tag:String = null;
+		for(key => value in variables)
+			if(value == sprite)
+			{
+				tag = key;
+				break;
+			}
+		if(tag == null) tag = 'luaSprite_' + luaSpriteTags.length;
+
+		if(!luaSpriteTags.contains(tag)) luaSpriteTags.push(tag);
+
+		// thêm vào state để render
+		if(inFront) add(sprite); else insert(members.indexOf(dad), sprite);
+
+		// thêm vào sprite list
+		var meta = new StageEditorMetaSprite({type: 'lua', name: tag}, sprite);
+		stageSprites.push(meta);
+		updateSpriteListRadio();
+	}
+	#end
 	
 	function reloadStageDropDown()
 	{
@@ -1456,6 +1596,30 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			if(FlxG.camera.target != null) FlxG.camera.target = null;
 			if(focusRadioGroup.checked > -1) focusRadioGroup.checked = -1;
 		}
+
+		// DRAG CAMERA (mouse/touch)
+		if (dragCameraCheckbox != null && dragCameraCheckbox.checked)
+		{
+			if (isDraggingCam)
+			{
+				if (FlxG.mouse.pressed && (FlxG.mouse.deltaScreenX != 0 || FlxG.mouse.deltaScreenY != 0))
+				{
+					var zoom:Float = FlxG.camera.zoom != 0 ? FlxG.camera.zoom : 1;
+					FlxG.camera.scroll.x -= FlxG.mouse.deltaScreenX / zoom;
+					FlxG.camera.scroll.y -= FlxG.mouse.deltaScreenY / zoom;
+					if(FlxG.camera.target != null) FlxG.camera.target = null;
+					if(focusRadioGroup.checked > -1) focusRadioGroup.checked = -1;
+				}
+				else if (!FlxG.mouse.pressed) isDraggingCam = false;
+			}
+			else if (FlxG.mouse.justPressed && !createPopup.visible && touchPad != null && !touchPad.anyPressed([ANY])
+				&& !FlxG.mouse.overlaps(UI_box, camHUD) && !FlxG.mouse.overlaps(UI_stagebox, camHUD)
+				&& !FlxG.mouse.overlaps(spriteList_box, camHUD) && !FlxG.mouse.overlaps(spriteListRadioGroup, camHUD))
+			{
+				isDraggingCam = true;
+			}
+		}
+		else isDraggingCam = false;
 
 		var lastZoom = FlxG.camera.zoom;
 		if(FlxG.keys.justPressed.R || touchPad.buttonZ.justPressed && !FlxG.keys.pressed.CONTROL)
@@ -1629,18 +1793,66 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 	// save
 
-	function saveObjectsToJson()
+	function saveObjectsToJson(?convertLua:Bool = false)
 	{
 		stageJson.objects = [];
 		for (basic in stageSprites)
-			stageJson.objects.push(basic.formatToJson());
+		{
+			if(basic == null) continue;
+			#if LUA_ALLOWED
+			if(basic.type == 'lua')
+			{
+				if(convertLua)
+				{
+					// convert lua sprite → json sprite object
+					var obj:Dynamic = basic.formatToJson();
+					obj.type = 'sprite';
+					// cố gắng lấy image path từ sprite graphic
+					if(basic.sprite != null && basic.sprite.graphic != null && basic.sprite.graphic.assetsKey != null)
+					{
+						var key:String = basic.sprite.graphic.assetsKey;
+						if(key.startsWith('images/')) key = key.substr('images/'.length);
+						if(key.endsWith('.png')) key = key.substr(0, key.length - 4);
+						obj.image = key;
+					}
+					stageJson.objects.push(obj);
+				}
+				// convertLua=false → bỏ qua, giữ trong Lua
+			}
+			else stageJson.objects.push(basic.formatToJson());
+			#else
+			if(basic.type != 'lua')
+				stageJson.objects.push(basic.formatToJson());
+			#end
+		}
 	}
 
 	function saveData()
 	{
 		if(_file != null) return;
 
-		saveObjectsToJson();
+		#if LUA_ALLOWED
+		if(luaSpriteTags.length > 0)
+		{
+			// có lua sprite → hiện prompt 2 lựa chọn
+			openSubState(new Prompt('Lua sprites found.\nSave as JSON objects\nor keep in Lua?', function()
+			{
+				// Yes → convert to JSON
+				doSaveData(true);
+			}, function()
+			{
+				// No → keep in Lua
+				doSaveData(false);
+			}, 'To JSON', 'Keep Lua'));
+			return;
+		}
+		#end
+		doSaveData(false);
+	}
+
+	function doSaveData(?convertLua:Bool = false)
+	{
+		saveObjectsToJson(convertLua);
 		var data = haxe.Json.stringify(stageJson, '\t');
 		#if mobile
 		unsavedProgress = false;
@@ -1884,6 +2096,9 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 	override function destroy()
 	{
+		#if LUA_ALLOWED
+		unloadStageLua();
+		#end
 		destroySubStates = true;
 		animationEditor.destroy();
 		super.destroy();
@@ -2026,19 +2241,32 @@ class StageEditorMetaSprite
 						obj.firstAnimation = firstAnimation;
 					}
 				}
+			case 'lua':
+				// lua sprite không save vào json trực tiếp (trừ khi convert)
+				// formatToJson chỉ gọi khi convertLua=true, khi đó type đã đổi thành 'sprite'
+				obj.name = name;
+				obj.x = x;
+				obj.y = y;
+				obj.scale = scale;
+				obj.scroll = scroll;
+				obj.alpha = alpha;
+				obj.angle = angle;
+				obj.color = color;
+				obj.filters = filters;
+				obj.image = image;
 		}
 		return obj;
 	}
 
 	public function update(curFilters:LoadFilters, elapsed:Float)
 	{
-		if((curFilters & filters) != 0 || StageData.reservedNames.contains(type))
+		if((curFilters & filters) != 0 || StageData.reservedNames.contains(type) || type == 'lua')
 			sprite.update(elapsed);
 	}
 
 	public function draw(curFilters:LoadFilters)
 	{
-		if((curFilters & filters) != 0 || StageData.reservedNames.contains(type))
+		if((curFilters & filters) != 0 || StageData.reservedNames.contains(type) || type == 'lua')
 			sprite.draw();
 	}
 }

@@ -588,8 +588,34 @@ class Paths
 	// Switch root mod
 	public static function switchModRoot(newRoot:String):Void
 	{
-		if (modRootDirs.contains(newRoot))
+		if (modRootDirs.contains(newRoot) && currentModRoot != newRoot)
+		{
 			currentModRoot = newRoot;
+			// Force parseList/updateModList đọc lại modsList.txt của root mới
+			Mods.updatedOnState = false;
+			#if LUA_ALLOWED
+			// Global mods cũng phải theo list của root mới
+			Mods.pushGlobalMods();
+			#end
+			// Persist để engine nhớ root sau khi thoát game
+			try {
+				FlxG.save.data.modRoot = newRoot;
+				FlxG.save.flush();
+			} catch(e:Dynamic) trace(e);
+		}
+	}
+
+	// Gọi lúc boot (sau FlxG.save.bind, trước Mods.loadTopMod)
+	public static function restoreModRoot():Void
+	{
+		try {
+			var saved:Dynamic = FlxG.save.data != null ? FlxG.save.data.modRoot : null;
+			if(saved != null && modRootDirs.contains(Std.string(saved)))
+			{
+				currentModRoot = Std.string(saved);
+				trace('[Mods] Restored mod root: $currentModRoot');
+			}
+		} catch(e:Dynamic) trace(e);
 	}
 
 	inline static public function modsJson(key:String)

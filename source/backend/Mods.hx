@@ -166,14 +166,93 @@ class Mods
 		return null;
 	}
 
+	/**
+	 * CustomBuild flag — mod opt-in vào widescreen layout mới.
+	 * Đọc từ pack.json HOẶC data/engine.json (data/Engine.json) của mod:
+	 *   "CustomBuild": true   hoặc   "CustomBuild": 1
+	 * Khi KHÔNG có flag: PlayState giữ layout 1280x720 chuẩn Psych
+	 * (stretch lấp màn hình nếu user bật Wide Screen) → HUD không bị kéo trái.
+	 * Khi CÓ flag: mod tự aware widescreen, engine expand width theo aspect.
+	 */
+	public static var customBuild:Bool = false;
+
+	public static function hasCustomBuild(?folder:String = null):Bool
+	{
+		#if MODS_ALLOWED
+		if(folder == null) folder = Mods.currentModDirectory;
+		if(folder == null || folder.length < 1) return false;
+
+		// pack.json
+		var pack:Dynamic = getPack(folder);
+		if(pack != null && Reflect.hasField(pack, 'CustomBuild'))
+		{
+			if(flagTruthy(Reflect.field(pack, 'CustomBuild'))) return true;
+		}
+
+		// data/engine.json hoặc data/Engine.json
+		for(root in Paths.modRootDirs)
+		{
+			var base:String = haxe.io.Path.join([Paths.modsRootByName(root), folder]);
+			for(rel in ['/data/engine.json', '/data/Engine.json'])
+			{
+				var p:String = base + rel;
+				#if sys
+				if(!FileSystem.exists(p)) continue;
+				try
+				{
+					var json:Dynamic = haxe.Json.parse(File.getContent(p));
+					if(json != null && Reflect.hasField(json, 'CustomBuild') && flagTruthy(Reflect.field(json, 'CustomBuild')))
+						return true;
+				}
+				catch(e:Dynamic) {}
+				#end
+			}
+		}
+		#end
+		return false;
+	}
+
+	static function flagTruthy(v:Dynamic):Bool
+	{
+		if(v == null || v == false) return false;
+		if(v == true) return true;
+		var s:String = StringTools.trim(Std.string(v)).toLowerCase();
+		return s == 'true' || s == '1';
+	}
+
 	public static var updatedOnState:Bool = false;
+
+	/**
+	 * modsList.txt theo từng root (mods/modsList.txt, mods1/modsList.txt...)
+	 * để enable/disable của root này không ghi đè root khác.
+	 * Migration: nếu root chưa có file mà còn file legacy ở thư mục game gốc
+	 * ('modsList.txt' cũ) thì copy sang làm điểm bắt đầu.
+	 */
+	public static function modsListPath():String
+	{
+		var base:String = #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end;
+		var rootDir:String = base + Paths.currentModRoot;
+		var perRoot:String = rootDir + '/modsList.txt';
+		var legacy:String = base + 'modsList.txt';
+		#if MODS_ALLOWED
+		try {
+			if(!FileSystem.exists(rootDir)) FileSystem.createDirectory(rootDir);
+			if(!FileSystem.exists(perRoot) && FileSystem.exists(legacy))
+				File.saveContent(perRoot, File.getContent(legacy));
+		} catch(e:Dynamic) {
+			trace(e);
+		}
+		#end
+		return perRoot;
+	}
+
 	inline public static function parseList():ModsList {
 		if(!updatedOnState) updateModList();
 		var list:ModsList = {enabled: [], disabled: [], all: []};
 
 		#if MODS_ALLOWED
 		try {
-			for (mod in CoolUtil.coolTextFile(#if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end 'modsList.txt'))
+			for (mod in CoolUtil.coolTextFile(modsListPath()))
 			{
 				//trace('Mod: $mod');
 				if(mod.trim().length < 1) continue;
@@ -195,24 +274,18 @@ class Mods
 	private static function updateModList()
 	{
 		#if MODS_ALLOWED
-		// Find all that are already ordered
+		var listPath:String = modsListPath();
+		// Find all that are already ordered — CHỈ theo root hiện tại
 		var list:Array<Array<Dynamic>> = [];
 		var added:Array<String> = [];
 		try {
-			for (mod in CoolUtil.coolTextFile(#if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end 'modsList.txt'))
+			for (mod in CoolUtil.coolTextFile(listPath))
 			{
 				var dat:Array<String> = mod.split("|");
 				var folder:String = dat[0];
-				// Check folder exists in ANY root dir
-				var exists:Bool = false;
-				for (root in Paths.modRootDirs)
-				{
-					if (FileSystem.exists(Paths.modsRootByName(root) + folder))
-					{
-						exists = true;
-						break;
-					}
-				}
+				// Check folder exists trong CURRENT root (không quét root khác
+				// — tránh merge enabled-state giữa các root)
+				var exists:Bool = FileSystem.exists(Paths.modsRootByName(Paths.currentModRoot) + folder);
 				if(folder.trim().length > 0 && exists && !added.contains(folder))
 				{
 					added.push(folder);
@@ -223,13 +296,19 @@ class Mods
 			trace(e);
 		}
 		
-		// Scan for folders that aren't on modsList.txt yet
-		for (folder in getModDirectories())
+		// Scan folders chưa có trong modsList.txt — CHỈ root hiện tại
+		var modsFolder:String = Paths.modsRootByName(Paths.currentModRoot);
+		if(FileSystem.exists(modsFolder))
 		{
-			if(folder.trim().length > 0 && !ignoreModFolders.contains(folder.toLowerCase()) && !added.contains(folder))
+			for (folder in Paths.readDirectory(modsFolder))
 			{
-				added.push(folder);
-				list.push([folder, true]);
+				var path:String = haxe.io.Path.join([modsFolder, folder]);
+				if(FileSystem.isDirectory(path) && folder.trim().length > 0
+					&& !ignoreModFolders.contains(folder.toLowerCase()) && !added.contains(folder))
+				{
+					added.push(folder);
+					list.push([folder, true]);
+				}
 			}
 		}
 
@@ -241,7 +320,7 @@ class Mods
 			fileStr += values[0] + '|' + (values[1] ? '1' : '0');
 		}
 
-		File.saveContent(#if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end 'modsList.txt', fileStr);
+		File.saveContent(listPath, fileStr);
 		updatedOnState = true;
 		//trace('Saved modsList.txt');
 		#end

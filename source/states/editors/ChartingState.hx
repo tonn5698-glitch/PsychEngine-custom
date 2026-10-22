@@ -856,12 +856,20 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 					if (controls.mobileC)
 					{
 						touchPad.forEachAlive(function(button:TouchButton){
-							if(button.tag != 'F')
+							if(button.tag != 'F' && button.tag != 'B')
 								button.visible = !button.visible;
 						});
 					}
 					var vis:Bool = !fullTipText.visible;
 					tipBg.visible = tipBg.active = fullTipText.visible = fullTipText.active = vis;
+				}
+				else if(touchPad.buttonB.justPressed)
+				{
+					PlayState.chartingMode = false;
+					MusicBeatState.switchState(new states.editors.MasterEditorMenu());
+					FlxG.sound.playMusic(Paths.music('freakyMenu'));
+					FlxG.mouse.visible = false;
+					return;
 				}
 
 				if (touchPad.buttonZ.justPressed)
@@ -869,7 +877,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 					if (controls.mobileC)
 					{
 						touchPad.forEachAlive(function(button:TouchButton){
-							if(button.tag != 'Z' && button.tag != 'LEFT' && button.tag != 'RIGHT' && button.tag != 'UP' && button.tag != 'DOWN')
+							if(button.tag != 'Z' && button.tag != 'B' && button.tag != 'LEFT' && button.tag != 'RIGHT' && button.tag != 'UP' && button.tag != 'DOWN')
 								touchPad.buttonUp2.visible = touchPad.buttonDown2.visible = button.visible = !button.visible;
 						});
 					}

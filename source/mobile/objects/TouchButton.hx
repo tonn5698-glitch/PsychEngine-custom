@@ -247,6 +247,10 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	{
 		super.update(elapsed);
 
+		// Re-assert brightness mỗi frame — một số driver Android reset uniform → button đen 1 frame
+		if (statusIndicatorType == BRIGHTNESS && brightShader != null)
+			brightShader.brightness.value = [statusBrightness[status]];
+
 		if (visible)
 		{
 			// Update the button, but only if at least either touches are enabled
@@ -485,7 +489,8 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	{
 		if (_spriteLabel != null)
 			_spriteLabel.color = Value;
-		brightShader.color = Value;
+		// Không set brightShader.color — fragment shader không dùng color uniform,
+		// ghi đè colorMultiplier/hasColorTransform của flixel gây flicker/black frame trên Android.
 		super.set_color(Value);
 		return Value;
 	}
@@ -613,8 +618,6 @@ private class TouchButtonEvent implements IFlxDestroyable
 
 class ButtonBrightnessShader extends FlxShader
 {
-	public var color(default, set):Null<FlxColor> = FlxColor.WHITE;
-
 	@:glFragmentSource('
 		#pragma header
 
@@ -631,19 +634,8 @@ class ButtonBrightnessShader extends FlxShader
 	public function new()
 	{
 		super();
-	}
-
-	private function set_color(?laColor:FlxColor)
-	{
-		if (laColor == null)
-		{
-			colorMultiplier.value = [1, 1, 1, 1];
-			hasColorTransform.value = hasTransform.value = [false];
-			return color = laColor;
-		}
-		hasColorTransform.value = hasTransform.value = [true];
-		colorMultiplier.value = [laColor.redFloat, laColor.blueFloat, laColor.greenFloat, laColor.alphaFloat];
-		return color = laColor;
+		// Default 1.0 — nếu uniform = 0 (chưa set / lost state) button sẽ render đen
+		brightness.value = [1.0];
 	}
 }
 

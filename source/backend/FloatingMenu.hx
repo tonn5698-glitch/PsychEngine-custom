@@ -13,9 +13,18 @@ class FloatingMenu
     // Gọi sau super.create() trong MusicBeatState.create(), mỗi state có nút MENU riêng
     public static function attach(state:FlxState):Void
     {
+        // Gỡ camera menu của state trước — nếu không, camera rỗng tích lũy mỗi lần switch state
+        // (nhiều render target rỗng trên Android → load GPU cao, dễ glitch/flicker)
+        if (cam != null)
+        {
+            FlxG.cameras.remove(cam, true);
+            cam = null;
+        }
+        btn = null; // btn cũ đã bị destroy cùng state cũ
+
         // Camera add sau cùng nên được vẽ trên cùng
         cam = new FlxCamera();
-        cam.bgColor = 0;
+        cam.bgColor = 0x00000000;
         FlxG.cameras.add(cam, false);
 
         btn = new PsychUIButton(FlxG.width / 2 - 32, 4, 'MENU', open, 64, 26);

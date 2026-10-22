@@ -79,12 +79,16 @@ class Main extends Sprite
 		hxvlc.util.Handle.init(#if (hxvlc >= "1.8.0")  ['--no-lua'] #end);
 		#end
 
+		// Save bind TRƯỚC loadTopMod — restore mod root đã switch ở session trước
+		FlxG.save.bind('funkin', CoolUtil.getSavePath());
+		#if MODS_ALLOWED
+		Paths.restoreModRoot();
+		#end
+		// pushGlobalMods SAU restore — đọc list của đúng root đã khôi phục
 		#if LUA_ALLOWED
 		Mods.pushGlobalMods();
 		#end
 		Mods.loadTopMod();
-
-		FlxG.save.bind('funkin', CoolUtil.getSavePath());
 		Highscore.load();
 
 		#if HSCRIPT_ALLOWED
@@ -157,10 +161,16 @@ class Main extends Sprite
 		// Resolution strategy (mobile):
 		// 1) fullScreenMode (Experiment): native device resolution cả W+H — rủi ro cao.
 		// 2) wideScreen: expand width theo aspect, height giữ 720 — ít rủi ro.
+		// CẢ HAI chỉ áp dụng khi mod active có CustomBuild flag (pack.json / engine.json).
+		// Mod cũ (không flag) giữ 1280x720 chuẩn Psych — Wide Screen sẽ stretch lấp màn
+		// (MobileScaleMode) thay vì expand logical width → HUD không bị kéo trái.
 		// loadPrefs() chưa chạy lúc này — đọc trực tiếp từ save (sau bind ở trên).
 		var gameW:Int = game.width;
 		var gameH:Int = game.height;
 		#if mobile
+		Mods.customBuild = Mods.hasCustomBuild();
+		trace('[CustomBuild] mod="${Mods.currentModDirectory}" flag=${Mods.customBuild}');
+
 		var nativeFull:Bool = ClientPrefs.data.fullScreenMode;
 		if (FlxG.save.data != null && FlxG.save.data.fullScreenMode != null)
 			nativeFull = FlxG.save.data.fullScreenMode;
@@ -168,6 +178,13 @@ class Main extends Sprite
 		var expandWidth:Bool = ClientPrefs.data.wideScreen;
 		if (FlxG.save.data != null && FlxG.save.data.wideScreen != null)
 			expandWidth = FlxG.save.data.wideScreen;
+
+		// Không CustomBuild → không expand logical size (giữ 1280x720 chuẩn)
+		if (!Mods.customBuild)
+		{
+			nativeFull = false;
+			expandWidth = false;
+		}
 
 		var stageW:Int = Lib.current.stage.stageWidth;
 		var stageH:Int = Lib.current.stage.stageHeight;

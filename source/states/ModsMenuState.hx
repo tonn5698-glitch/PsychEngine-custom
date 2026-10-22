@@ -109,7 +109,7 @@ class ModsMenuState extends MusicBeatState
 		else
 			daY = 20;
 
-		buttonReload = new MenuButton(buttonX, bgList.y + bgList.height + daY, buttonWidth, buttonHeight, Language.getPhrase('reload_button', 'RELOAD'), reload);
+		buttonReload = new MenuButton(buttonX, bgList.y + bgList.height + daY, buttonWidth, buttonHeight, Language.getPhrase('reload_button', 'RELOAD'), function() reload());
 		add(buttonReload);
 		
 		var myY = buttonReload.y + buttonReload.bg.height + 20;
@@ -121,12 +121,16 @@ class ModsMenuState extends MusicBeatState
 
 		buttonModRoot = new MenuButton(buttonX, myY + 25, buttonWidth, buttonHeight - 20, 'SWITCH ROOT', function() {
 			// Cycle: mods → mods1 → mods2 → mods
+			// 1) Lưu list của root CŨ trước khi đổi (tránh đè root cũ bằng data root mới)
+			saveTxt();
 			var roots = Paths.modRootDirs;
 			var curIdx = roots.indexOf(Paths.currentModRoot);
 			curIdx = (curIdx + 1) % roots.length;
+			// 2) Switch root (persist vào save + updatedOnState=false)
 			Paths.switchModRoot(roots[curIdx]);
-			modRootText.text = 'Root: ${Paths.currentModRoot}';
-			reload();
+			// 3) Reload lại state với root mới — KHÔNG saveTxt lần nữa
+			//    (saveTxt lần 2 sẽ ghi list root cũ vào file root mới)
+			reload(false);
 			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		});
 		add(buttonModRoot);
@@ -800,9 +804,10 @@ class ModsMenuState extends MusicBeatState
 		buttonDisableAll.visible = buttonDisableAll.enabled = buttonDisableAll.active = !buttonEnableAll.visible;
 	}
 
-	function reload()
+	function reload(doSave:Bool = true)
 	{
-		saveTxt();
+		// doSave=false: sau switchRoot — root đã lưu trước đó, chỉ recreate state
+		if(doSave) saveTxt();
 		FlxG.autoPause = ClientPrefs.data.autoPause;
 		FlxTransitionableState.skipNextTransIn = true;
 		FlxTransitionableState.skipNextTransOut = true;
@@ -824,8 +829,10 @@ class ModsMenuState extends MusicBeatState
 			fileStr += '$mod|$on';
 		}
 
-		var path:String = #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end 'modsList.txt';
+		// modsList.txt theo root hiện tại (mods/modsList.txt, mods1/...)
+		var path:String = Mods.modsListPath();
 		File.saveContent(path, fileStr);
+		Mods.updatedOnState = false; // force parseList đọc lại file vừa ghi
 		Mods.parseList();
 		Mods.loadTopMod();
 	}

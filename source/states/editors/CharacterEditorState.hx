@@ -75,6 +75,8 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 	var cameraPosition:Point = new Point();
 	var isDragging:Bool = false;
 	var cameraLocked:Bool = false; // Khóa camera: drag không di chuyển
+	var lastDragMouseX:Float = 0;
+	var lastDragMouseY:Float = 0;
 	// cursorIndicator đã khai báo trong MusicBeatState (base class)
 
 	public function new(char:String = null, goToPlayState:Bool = true)
@@ -176,7 +178,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		add(frameAdvanceText);
 
 		addHelpScreen();
-		FlxG.mouse.visible = false; // Ẩn cursor trên game (mobile dùng touch)
+		FlxG.mouse.visible = !cameraLocked; // Hiện cursor khi camera unlocked (drag được)
 		FlxG.camera.zoom = 1;
 
 		makeUIMenu();
@@ -189,6 +191,10 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
 		addTouchPadCamera();
+
+		FlxG.stage.addEventListener(MouseEvent.MOUSE_DOWN, onMouseEvent);
+		FlxG.stage.addEventListener(MouseEvent.MOUSE_MOVE, onMouseEvent);
+		FlxG.stage.addEventListener(MouseEvent.MOUSE_UP, onMouseEvent);
 
 		// Cursor indicator nhấp nháy ở góc phải dưới (hình mũi tên)
 		// cursorIndicator được tạo trong MusicBeatState.create()
@@ -654,6 +660,8 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 			cameraLocked = !cameraLocked;
 			camLockText.text = cameraLocked ? 'Camera: LOCKED' : 'Camera: UNLOCKED';
 			camLockText.color = cameraLocked ? 0xFFFF6666 : FlxColor.GREEN;
+			FlxG.mouse.visible = !cameraLocked;
+			if (cameraLocked) isDragging = false;
 			FlxG.sound.play(Paths.sound('scrollMenu'), 0.6);
 		});
 		tab_group.add(camLockText);
@@ -1531,25 +1539,42 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		}
 	}
 
+	function isMouseOverUI():Bool
+	{
+		if (UI_box != null && FlxG.mouse.overlaps(UI_box, camHUD)) return true;
+		if (UI_characterbox != null && FlxG.mouse.overlaps(UI_characterbox, camHUD)) return true;
+		return false;
+	}
+
 	function onMouseEvent(e:MouseEvent):Void
 	{
 		if (cameraLocked) return; // Khóa camera -> bỏ qua drag
-		if (touchPad != null && !touchPad.anyPressed([ANY]))
-			switch (e.type)
-			{
-				case MouseEvent.MOUSE_DOWN:
-					var mouse = new Point(e.stageX, e.stageY); // OpenFL mouse position
-					cameraPosition.x = FlxG.camera.scroll.x + mouse.x;
-					cameraPosition.y = FlxG.camera.scroll.y + mouse.y;
-					isDragging = true;
+		if (touchPad != null && touchPad.anyPressed([ANY])) return;
+		switch (e.type)
+		{
+			case MouseEvent.MOUSE_DOWN:
+				if (isMouseOverUI()) return;
+				lastDragMouseX = e.stageX;
+				lastDragMouseY = e.stageY;
+				isDragging = true;
 
-				case MouseEvent.MOUSE_MOVE if (isDragging):
-					var mouse = new Point(e.stageX, e.stageY);
-					FlxG.camera.scroll.x = cameraPosition.x - mouse.x;
-					FlxG.camera.scroll.y = cameraPosition.y - mouse.y;
+			case MouseEvent.MOUSE_MOVE if (isDragging):
+				var zoom:Float = FlxG.camera.zoom != 0 ? FlxG.camera.zoom : 1;
+				FlxG.camera.scroll.x -= (e.stageX - lastDragMouseX) / zoom;
+				FlxG.camera.scroll.y -= (e.stageY - lastDragMouseY) / zoom;
+				lastDragMouseX = e.stageX;
+				lastDragMouseY = e.stageY;
 
-				case MouseEvent.MOUSE_UP:
-					isDragging = false;
-			}
+			case MouseEvent.MOUSE_UP:
+				isDragging = false;
+		}
+	}
+
+	override function destroy()
+	{
+		FlxG.stage.removeEventListener(MouseEvent.MOUSE_DOWN, onMouseEvent);
+		FlxG.stage.removeEventListener(MouseEvent.MOUSE_MOVE, onMouseEvent);
+		FlxG.stage.removeEventListener(MouseEvent.MOUSE_UP, onMouseEvent);
+		super.destroy();
 	}
 }

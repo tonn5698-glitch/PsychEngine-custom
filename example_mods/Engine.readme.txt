@@ -3,6 +3,16 @@ ENGINE.json (CẤU HÌNH MOD)
 Copy file Engine.json này vào thư mục mod của bạn:
     <MyMod>/data/Engine.json
 
+CUSTOMBUILD (HUD widescreen — hoặc đặt cùng tên trong pack.json):
+    - "CustomBuild": true    (hoặc 1)
+    - Mod MỚI layout theo màn rộng (HUD tự căn giữa theo FlxG.width):
+      KHÔNG có flag này → PlayState giữ 1280x720 chuẩn Psych
+      (Wide Screen sẽ stretch lấp màn thay vì expand logical width)
+      → HUD cũ không bị kéo sang trái.
+    - Mod design sẵn cho widescreen (tọa độ > 1280, đặt theo W thật)
+      PHẢI khai "CustomBuild": true trong pack.json HOẶC data/Engine.json.
+    - Flag đọc lúc khởi động theo mod đầu tiên trong modsList.
+
 VIDEO INTRO TÙY BIẾN (Enable Custom Intro Video trong Experiment):
     - "video": "intro.mp4"
     - Đặt video thật tại: <MyMod>/videos/intro.mp4

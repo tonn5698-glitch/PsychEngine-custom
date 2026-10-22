@@ -6,6 +6,15 @@ class HealthIcon extends FlxSprite
 	private var isPlayer:Bool = false;
 	private var char:String = '';
 
+	public var rotationX:Float = 0;
+	public var rotationY:Float = 0;
+	public var rotationZ:Float = 0;
+	public var z3d:Float = 0;
+	public var perspDist:Float = 1000;
+	public var spinX:Float = 0;
+	public var spinY:Float = 0;
+	public var spinZ:Float = 0;
+
 	public function new(char:String = 'face', isPlayer:Bool = false, ?allowGPU:Bool = true)
 	{
 		super();
@@ -20,6 +29,10 @@ class HealthIcon extends FlxSprite
 
 		if (sprTracker != null)
 			setPosition(sprTracker.x + sprTracker.width + 12, sprTracker.y - 30);
+
+		if (spinX != 0) rotationX += spinX * elapsed;
+		if (spinY != 0) rotationY += spinY * elapsed;
+		if (spinZ != 0) rotationZ += spinZ * elapsed;
 	}
 
 	private var iconOffsets:Array<Float> = [0, 0];
@@ -60,5 +73,35 @@ class HealthIcon extends FlxSprite
 
 	public function getCharacter():String {
 		return char;
+	}
+
+	override function draw()
+	{
+		if (rotationX == 0 && rotationY == 0 && rotationZ == 0 && z3d == 0)
+		{
+			super.draw();
+			return;
+		}
+
+		var oldAngle:Float = angle;
+		var oldScaleX:Float = scale.x;
+		var oldScaleY:Float = scale.y;
+
+		var persp:Float = 1;
+		if (z3d != 0)
+		{
+			var dist:Float = perspDist - z3d;
+			if (dist < 1) dist = 1;
+			persp = perspDist / dist;
+		}
+
+		angle = oldAngle + rotationZ;
+		scale.x = oldScaleX * Math.cos(rotationY * Math.PI / 180) * persp;
+		scale.y = oldScaleY * Math.cos(rotationX * Math.PI / 180) * persp;
+
+		super.draw();
+
+		angle = oldAngle;
+		scale.set(oldScaleX, oldScaleY);
 	}
 }
