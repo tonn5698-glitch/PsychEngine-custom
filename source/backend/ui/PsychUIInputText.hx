@@ -704,6 +704,9 @@ class PsychUIInputText extends FlxSpriteGroup
 	
 	private function filter(text:String):String
 	{
+		// text=null (vd set_text(null)) → không được chạy filter/EReg, tránh crash
+		if(text == null) return null;
+
 		switch(forceCase)
 		{
 			case UPPER_CASE:
@@ -735,7 +738,7 @@ class PsychUIInputText extends FlxSpriteGroup
 				default:
 					throw new flash.errors.Error("FlxInputText: Unknown filterMode (" + filterMode + ")");
 			}
-			text = pattern.replace(text, "");
+			if(pattern != null) text = pattern.replace(text, "");
 		}
 		return text;
 	}

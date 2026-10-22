@@ -1275,8 +1275,9 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		if(selected == null) return;
 
 		// Texts/Input Texts
-		colorInputText.text = selected.color;
-		nameInputText.text = selected.name;
+		// character meta không có name/color → tránh set null vào input đang bật filter
+		colorInputText.text = selected.color != null ? selected.color : 'FFFFFF';
+		nameInputText.text = selected.name != null ? selected.name : '';
 		imgTxt.text = 'Image: ' + selected.image;
 
 		// Steppers

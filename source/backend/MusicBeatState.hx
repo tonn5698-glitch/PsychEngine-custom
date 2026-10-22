@@ -178,8 +178,6 @@ class MusicBeatState extends FlxState
 
 		super.create();
 
-		FloatingMenu.attach(this);
-
 		if(!skip) {
 			openSubState(new CustomFadeTransition(0.5, true));
 		}
