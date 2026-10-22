@@ -230,7 +230,7 @@ class Mods
 	 */
 	public static function modsListPath():String
 	{
-		var base:String = #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end;
+		var base:String = #if android StorageUtil.getExternalStorageDirectory() #else Sys.getCwd() #end;
 		var rootDir:String = base + Paths.currentModRoot;
 		var perRoot:String = rootDir + '/modsList.txt';
 		var legacy:String = base + 'modsList.txt';
