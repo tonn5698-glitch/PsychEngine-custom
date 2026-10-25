@@ -54,7 +54,6 @@ class LoadingState extends MusicBeatState
 	
 	var target:FlxState = null;
 	var stopMusic:Bool = false;
-	var dontUpdate:Bool = false;
 
 	var barGroup:FlxSpriteGroup;
 	var bar:FlxSprite;
@@ -63,8 +62,8 @@ class LoadingState extends MusicBeatState
 	var curPercent:Float = 0;
 	var stateChangeDelay:Float = 0;
 	var loadingElapsed:Float = 0;
-	var playStatePreparationStarted:Bool = false;
-	var playStatePreparationRequired:Bool = false;
+	// Assets đã 100% — chờ script shouldContinue() (nếu mod có) cho phép switch
+	var readyToContinue:Bool = false;
 
 	#if PSYCH_WATERMARKS
 	var logo:FlxSprite;
@@ -186,15 +185,11 @@ class LoadingState extends MusicBeatState
 		#end
 		applyLoadingScreenConfig(barBack, bar);
 
-		playStatePreparationRequired = Std.isOfType(target, PlayState);
-
 		super.create();
 
-		if (stateChangeDelay <= 0 && checkLoaded() && (!playStatePreparationRequired || PlayState.loadingPreparationReady))
-		{
-			dontUpdate = true;
-			onLoad();
-		}
+		// Tải xong ngay từ đầu → không auto switch nữa, chờ shouldContinue() (script) cho phép
+		if (stateChangeDelay <= 0 && checkLoaded())
+			readyToContinue = true;
 	}
 
 	// P2: declarative loading-screen config. Reads mods/<ModDir>/data/loadingScreen.json
@@ -267,37 +262,28 @@ class LoadingState extends MusicBeatState
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
-		if (dontUpdate) return;
 
 		if (!transitioning)
 		{
 			loadingElapsed += elapsed;
 			var assetsReady:Bool = checkLoaded();
-			if(playStatePreparationRequired && assetsReady)
+			var assetPercent:Float = loadMax > 0 ? Math.min(1, loaded / loadMax) : 1;
+			intendedPercent = assetPercent;
+
+			if (assetsReady && !readyToContinue)
 			{
-				if(!playStatePreparationStarted)
-				{
-					playStatePreparationStarted = true;
-					PlayState.beginLoadingPreparation();
-				}
-				PlayState.updateLoadingPreparation();
+				if(stateChangeDelay <= 0) readyToContinue = true;
+				else stateChangeDelay = Math.max(0, stateChangeDelay - elapsed);
 			}
 
-			var prepPercent:Float = playStatePreparationRequired ? PlayState.loadingPreparationProgress : 1;
-			var assetPercent:Float = loadMax > 0 ? Math.min(1, loaded / loadMax) : 1;
-			intendedPercent = playStatePreparationRequired
-				? (assetPercent * 0.75 + prepPercent * 0.25)
-				: assetPercent;
-
-			if (!finishedLoading && assetsReady && (!playStatePreparationRequired || PlayState.loadingPreparationReady))
+			// Switch sang PlayState khi: assets 100% VÀ script cho phép
+			// (script không có shouldContinue() → canProceed() luôn true = auto như cũ)
+			if (readyToContinue && canProceed())
 			{
-				if(stateChangeDelay <= 0)
-				{
-					transitioning = true;
-					onLoad();
-					return;
-				}
-				else stateChangeDelay = Math.max(0, stateChangeDelay - elapsed);
+				transitioning = true;
+				// fade đen trước khi switch → không có frame đen nhấp nháy
+				FlxG.camera.fade(FlxColor.BLACK, 0.3, false, onLoad, true);
+				return;
 			}
 		}
 
@@ -331,8 +317,9 @@ class LoadingState extends MusicBeatState
 			case 2:
 				dots = '...';
 		}
-		var statusText:String = playStatePreparationRequired && PlayState.loadingPreparationStatus != null
-			? PlayState.loadingPreparationStatus
+		// Chỉ hiện "click to continue" khi script thật sự đang CHỜ (shouldContinue() == false)
+		var statusText:String = (readyToContinue && !canProceed())
+			? Language.getPhrase('loading_continue', 'Load finished — click to continue')
 			: Language.getPhrase('now_loading', 'Now Loading{1}', [dots]);
 
 		if(loadingElapsed > 0.5 && intendedPercent > 0.02 && intendedPercent < 0.999)
@@ -414,6 +401,31 @@ class LoadingState extends MusicBeatState
 	#end
 	
 	var finishedLoading:Bool = false;
+
+	/**
+	 * Hook shouldContinue() cho softcoded loading screen (mods/<Mod>/data/LoadingScreen.hx):
+	 * script trả false → engine CHỜ (vd: đang đợi người chơi bấm "click to continue").
+	 * Không có hook, hoặc script lỗi → trả về true = switch ngay như mặc định.
+	 */
+	function canProceed():Bool
+	{
+		#if HSCRIPT_ALLOWED
+		if(hscript != null && hscript.exists('shouldContinue'))
+		{
+			try
+			{
+				var v:Dynamic = hscript.call('shouldContinue');
+				if(v == false || v == 0) return false;
+			}
+			catch(e:Dynamic)
+			{
+				trace('LoadingScreen shouldContinue() error: $e');
+			}
+		}
+		#end
+		return true;
+	}
+
 	function onLoad()
 	{
 		_loaded();

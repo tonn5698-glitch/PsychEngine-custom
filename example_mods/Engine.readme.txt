@@ -13,6 +13,24 @@ CUSTOMBUILD (HUD widescreen — hoặc đặt cùng tên trong pack.json):
       PHẢI khai "CustomBuild": true trong pack.json HOẶC data/Engine.json.
     - Flag đọc lúc khởi động theo mod đầu tiên trong modsList.
 
+LOADING SCREEN SOFTCODED (HScript — chỉ mod, KHÔNG hardcode trong engine):
+    - Đặt file:  <MyMod>/data/LoadingScreen.hx   (xem ví dụ example_mods/data/LoadingScreen.hx)
+    - Hook engine đọc:
+        onCreate()        — BẮT BUỘC có, thiếu là engine bỏ qua script
+        onUpdate(elapsed) — mỗi frame
+        shouldContinue()  — trả false → engine CHỜ chưa vào PlayState
+                            (dùng cho kiểu "Load finished, click to continue")
+                            Không có hook = engine tự switch như mặc định
+        onDestroy()       — khi loading xong
+    - Biến engine cấp: getLoaded(), getLoadMax(), bar, barBack
+      (khai báo sau khi parse → chỉ dùng bên trong function)
+    - Script vẽ UI của mình nên build sprite ở frame ĐẦU của onUpdate
+      (onCreate chạy trước khi engine dựng background mặc định).
+    - Khi script có mặt, engine không update logo/status mặc định nữa →
+      script tự toàn quyền giao diện.
+    - Xem thêm flow: LoadingState (asset 100%) → fade → PlayState
+      (overlay progress theo phase khởi tạo) → gameplay.
+
 VIDEO INTRO TÙY BIẾN (Enable Custom Intro Video trong Experiment):
     - "video": "intro.mp4"
     - Đặt video thật tại: <MyMod>/videos/intro.mp4
