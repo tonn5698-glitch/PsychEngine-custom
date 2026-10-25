@@ -171,7 +171,9 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 
 	public var statusIndicatorType(default, set):StatusIndicators = ALPHA;
 
-	public var brightShader:ButtonBrightnessShader = new ButtonBrightnessShader();
+	// Màu gốc cấu hình từ TouchPad/JSON. BRIGHTNESS áp bằng cách nhân color
+	// (thay cho ButtonBrightnessShader — shader per-sprite rò state trên Android gây flicker)
+	public var indicatorBaseColor:FlxColor = FlxColor.WHITE;
 
 	public var justReleased(get, never):Bool;
 	public var released(get, never):Bool;
@@ -204,9 +206,6 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	public function new(X:Float = 0, Y:Float = 0):Void
 	{
 		super(X, Y);
-
-		if (statusIndicatorType == BRIGHTNESS)
-			shader = brightShader;
 
 		onUp = new TouchButtonEvent();
 		onDown = new TouchButtonEvent();
@@ -246,10 +245,6 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	override public function update(elapsed:Float):Void
 	{
 		super.update(elapsed);
-
-		// Re-assert brightness mỗi frame — một số driver Android reset uniform → button đen 1 frame
-		if (statusIndicatorType == BRIGHTNESS && brightShader != null)
-			brightShader.brightness.value = [statusBrightness[status]];
 
 		if (visible)
 		{
@@ -383,9 +378,31 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 			case ALPHA:
 				alpha = statusAlphas[status];
 			case BRIGHTNESS:
-				brightShader.brightness.value = [statusBrightness[status]];
+				applyIndicatorColor();
 			case NONE: // no balls
 		}
+	}
+
+	// Color thực tế = indicatorBaseColor * brightness (BRIGHTNESS) hoặc baseColor (mode còn lại)
+	function applyIndicatorColor()
+	{
+		var c:FlxColor = indicatorBaseColor;
+		if (statusIndicatorType == BRIGHTNESS)
+		{
+			var b:Float = statusBrightness[status];
+			if (b != 1)
+			{
+				// nhân RGB bằng Int math — không phụ thuộc API property của FlxColor
+				var base:Int = indicatorBaseColor;
+				var r:Int = Std.int(((base >> 16) & 0xFF) * b);
+				var g:Int = Std.int(((base >> 8) & 0xFF) * b);
+				var bl:Int = Std.int((base & 0xFF) * b);
+				c = ((base >>> 24) << 24) | (r << 16) | (g << 8) | bl;
+			}
+		}
+		super.set_color(c);
+		if (_spriteLabel != null)
+			_spriteLabel.color = c;
 	}
 
 	/**
@@ -442,9 +459,6 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 
 		updateLabelPosition();
 
-		if (statusIndicatorType == BRIGHTNESS && label != null && brightShader != null)
-			_spriteLabel.shader = brightShader;
-
 		return Value;
 	}
 
@@ -487,11 +501,8 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 
 	override function set_color(Value:FlxColor):Int
 	{
-		if (_spriteLabel != null)
-			_spriteLabel.color = Value;
-		// Không set brightShader.color — fragment shader không dùng color uniform,
-		// ghi đè colorMultiplier/hasColorTransform của flixel gây flicker/black frame trên Android.
-		super.set_color(Value);
+		indicatorBaseColor = Value;
+		applyIndicatorColor();
 		return Value;
 	}
 
@@ -530,19 +541,9 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 
 	function set_statusIndicatorType(Value:StatusIndicators)
 	{
-		if (Value == BRIGHTNESS)
-		{
-			shader = brightShader;
-			if (_spriteLabel != null)
-				_spriteLabel.shader = brightShader;
-		}
-		else
-		{
-			shader = null;
-			if (_spriteLabel != null)
-				_spriteLabel.shader = null;
-		}
 		statusIndicatorType = Value;
+		// Mode đổi → áp lại màu (BRIGHTNESS tint / còn lại về baseColor), không dùng shader
+		applyIndicatorColor();
 		return Value;
 	}
 
@@ -613,29 +614,6 @@ private class TouchButtonEvent implements IFlxDestroyable
 		if (sound != null)
 			sound.play(true);
 		#end
-	}
-}
-
-class ButtonBrightnessShader extends FlxShader
-{
-	@:glFragmentSource('
-		#pragma header
-
-		uniform float brightness;
-
-		void main()
-		{
-			vec4 col = flixel_texture2D(bitmap, openfl_TextureCoordv);
-			col.rgb *= brightness;
-
-			gl_FragColor = col;
-		}
-	')
-	public function new()
-	{
-		super();
-		// Default 1.0 — nếu uniform = 0 (chưa set / lost state) button sẽ render đen
-		brightness.value = [1.0];
 	}
 }
 
