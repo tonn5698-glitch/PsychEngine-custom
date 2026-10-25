@@ -106,7 +106,9 @@ class LoadingState extends MusicBeatState
 		#if HSCRIPT_ALLOWED
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.trim().length > 0)
 		{
-			var scriptPath:String = 'mods/${Mods.currentModDirectory}/data/LoadingScreen.hx'; //mods/My-Mod/data/LoadingScreen.hx
+			// Paths.mods() → đúng root hiện tại (/sdcard/.PsychEngine/<root>/...) thay vì
+			// path tương đối 'mods/...' (trên Android cwd = app files dir → sai chỗ)
+			var scriptPath:String = Paths.mods('data/LoadingScreen.hx');
 			if(FileSystem.exists(scriptPath))
 			{
 				try
@@ -201,7 +203,7 @@ class LoadingState extends MusicBeatState
 	{
 		if (Mods.currentModDirectory == null || Mods.currentModDirectory.trim().length < 1) return;
 
-		var cfgPath:String = 'mods/${Mods.currentModDirectory}/data/loadingScreen.json';
+		var cfgPath:String = Paths.mods('data/loadingScreen.json');
 		if (!FileSystem.exists(cfgPath)) return;
 
 		var config:Dynamic = null;
