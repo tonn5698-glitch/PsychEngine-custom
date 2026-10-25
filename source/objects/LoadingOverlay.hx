@@ -88,7 +88,7 @@ class LoadingOverlay extends FlxSpriteGroup
 
 	public function setProgress(percent:Float, status:String):Void
 	{
-		targetPercent = FlxMath.clamp(percent, 0, 1);
+		targetPercent = FlxMath.bound(percent, 0, 1);
 		if (status != null && status.length > 0) statusText.text = status;
 	}
 
