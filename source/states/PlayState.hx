@@ -277,24 +277,156 @@ class PlayState extends MusicBeatState
 	private static var _lastLoadedModDirectory:String = '';
 	public static var nextReloadAll:Bool = false;
 
-	// ===== Phased PlayState creation (loading overlay) =====
-	// create() chia thành nhiều phase, mỗi phase chạy trên 1 frame riêng để overlay
-	// hiển thị progress thay vì để game đơ 1 frame dài khi khởi tạo PlayState.
-	// Overlay nằm trên camera riêng (camLoad) nên che phủ cả stage/HUD đang dựng dở.
-	public var overlay:LoadingOverlay;
-	public var camLoad:FlxCamera;
-	var creationPhase:Int = 0; // 0 = xong phase 0 (create), 1..5 chờ chạy, 6 = hoàn tất
-	var creationComplete:Bool = false;
-	var overlayPendingRemove:Bool = false;
+	// LoadingState uses this lightweight preparation pass to receive real
+	// PlayState progress before the state is switched in. It deliberately does
+	// NOT create Flixel objects, cameras, HUD or scripts.
+	public static var loadingPreparationReady:Bool = false;
+	public static var loadingPreparationProgress:Float = 0;
+	public static var loadingPreparationStatus:String = 'Preparing gameplay...';
+	private static var loadingPreparationStep:Int = 0;
+	private static var loadingPreparationCharacters:Array<String> = [];
+	private static var loadingPreparationCharacterIndex:Int = 0;
+	private static var loadingPreparationSectionIndex:Int = 0;
+	private static var loadingPreparationNoteIndex:Int = 0;
+	private static var loadingPreparationTotalNotes:Int = 0;
+	private static var loadingPreparationDoneNotes:Int = 0;
 
-	// Biến local của create() nhưng cần dùng lại ở các phase sau → đưa thành field
-	var stageData:StageFile;
-	var camPos:FlxPoint;
+	public static function beginLoadingPreparation():Void
+	{
+		loadingPreparationReady = false;
+		loadingPreparationProgress = 0;
+		loadingPreparationStatus = 'Preparing gameplay...';
+		loadingPreparationStep = 0;
+		loadingPreparationCharacters = [];
+		loadingPreparationCharacterIndex = 0;
+		loadingPreparationSectionIndex = 0;
+		loadingPreparationNoteIndex = 0;
+		loadingPreparationTotalNotes = 0;
+		loadingPreparationDoneNotes = 0;
+	}
+
+	public static function updateLoadingPreparation():Void
+	{
+		if(loadingPreparationReady || SONG == null)
+		{
+			if(SONG == null)
+			{
+				loadingPreparationProgress = 1;
+				loadingPreparationStatus = 'Ready';
+				loadingPreparationReady = true;
+			}
+			return;
+		}
+
+		try
+		{
+			switch(loadingPreparationStep)
+			{
+				case 0:
+					loadingPreparationStatus = 'Preparing song data...';
+					if(SONG.stage == null || SONG.stage.length < 1)
+						SONG.stage = StageData.vanillaSongStage(Paths.formatToSongPath(Song.loadedSongName));
+					loadingPreparationProgress = 0.10;
+					loadingPreparationStep++;
+
+				case 1:
+					loadingPreparationStatus = 'Preparing stage...';
+					StageData.getStageFile(SONG.stage);
+					loadingPreparationProgress = 0.22;
+					loadingPreparationStep++;
+
+				case 2:
+					if(loadingPreparationCharacters.length < 1)
+					{
+						for(char in [SONG.player1, SONG.player2, SONG.gfVersion])
+							if(char != null && char.length > 0 && !loadingPreparationCharacters.contains(char))
+								loadingPreparationCharacters.push(char);
+					}
+					if(loadingPreparationCharacterIndex < loadingPreparationCharacters.length)
+					{
+						loadingPreparationStatus = 'Preparing character ' + (loadingPreparationCharacterIndex + 1) + '/' + loadingPreparationCharacters.length + '...';
+					prepareCharacterData(loadingPreparationCharacters[loadingPreparationCharacterIndex]);
+					loadingPreparationCharacterIndex++;
+					loadingPreparationProgress = 0.22 + (0.23 * loadingPreparationCharacterIndex / Math.max(1, loadingPreparationCharacters.length));
+					}
+					else
+					{
+						loadingPreparationStep++;
+					}
+
+				case 3:
+					if(loadingPreparationTotalNotes < 1 && SONG.notes != null)
+					{
+						for(section in SONG.notes)
+							if(section != null && section.sectionNotes != null)
+								loadingPreparationTotalNotes += section.sectionNotes.length;
+					}
+					if(loadingPreparationDoneNotes < loadingPreparationTotalNotes)
+					{
+						var budget:Int = 250;
+						while(budget-- > 0 && loadingPreparationSectionIndex < SONG.notes.length)
+						{
+							var section = SONG.notes[loadingPreparationSectionIndex];
+							if(section == null || section.sectionNotes == null || loadingPreparationNoteIndex >= section.sectionNotes.length)
+							{
+								loadingPreparationSectionIndex++;
+								loadingPreparationNoteIndex = 0;
+								continue;
+							}
+							loadingPreparationNoteIndex++;
+							loadingPreparationDoneNotes++;
+						}
+						loadingPreparationStatus = 'Preparing chart... ' + loadingPreparationDoneNotes + '/' + loadingPreparationTotalNotes;
+						loadingPreparationProgress = 0.45 + (0.40 * loadingPreparationDoneNotes / Math.max(1, loadingPreparationTotalNotes));
+					}
+					else
+					{
+						loadingPreparationStep++;
+					}
+
+				case 4:
+					// Event charts are loaded/merged by the normal song-generation path.
+					// Do not call Song.getChart() here: it can perform synchronous file
+					// discovery/parsing and stall the loading screen on some mod charts.
+					loadingPreparationStatus = 'Finalizing event data...';
+					loadingPreparationProgress = 0.95;
+					loadingPreparationStep++;
+
+				case 5:
+					loadingPreparationStatus = 'PlayState ready';
+					loadingPreparationProgress = 1;
+					loadingPreparationReady = true;
+			}
+		}
+		catch(e:Dynamic)
+		{
+			trace('PlayState loading preparation warning: $e');
+			loadingPreparationStep++;
+		}
+	}
+
+	private static function prepareCharacterData(char:String):Void
+	{
+		if(char == null || char.length < 1) return;
+		try
+		{
+			var path:String = Paths.getPath('characters/$char.json', TEXT);
+			#if MODS_ALLOWED
+			if(FileSystem.exists(path)) Json.parse(File.getContent(path));
+			#else
+			if(Assets.exists(path)) Json.parse(Assets.getText(path));
+			#end
+		}
+		catch(e:Dynamic) {}
+	}
 
 	public var luaTouchPad:TouchPad;
 
 	override public function create()
 	{
+		// Mod không có CustomBuild → PlayState chạy 1280x720 chuẩn (restore khi destroy)
+		backend.GameSize.enterPlayState();
+
 		//Optimization: Enable GC toggle (ported from JS Engine) to avoid lagspikes
 		#if cpp
 		cpp.vm.Gc.enable(ClientPrefs.data.enableGC);
@@ -386,7 +518,7 @@ class PlayState extends MusicBeatState
 
 		curStage = SONG.stage;
 
-		stageData = StageData.getStageFile(curStage);
+		var stageData:StageFile = StageData.getStageFile(curStage);
 		defaultCamZoom = stageData.defaultZoom;
 
 		stageUI = "normal";
@@ -424,15 +556,6 @@ class PlayState extends MusicBeatState
 		if(girlfriendCameraOffset == null)
 			girlfriendCameraOffset = [0, 0];
 
-		// ===== PHASE 0 xong: bật overlay loading, các phase sau chạy trên frame riêng =====
-		initLoadingOverlay();
-		creationPhase = 1;
-		applyPhaseProgress(0);
-	}
-
-	// PHASE 1: stage instance + nhân vật + object của stage
-	function createPhaseCharacters():Void
-	{
 		boyfriendGroup = new FlxSpriteGroup(BF_X, BF_Y);
 		dadGroup = new FlxSpriteGroup(DAD_X, DAD_Y);
 		gfGroup = new FlxSpriteGroup(GF_X, GF_Y);
@@ -489,11 +612,7 @@ class PlayState extends MusicBeatState
 			add(dadGroup);
 			add(boyfriendGroup);
 		}
-	}
-
-	// PHASE 2: script thư mục chung + tính camPos + stage/character scripts + group HUD
-	function createPhaseScripts():Void
-	{
+		
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 		// "SCRIPTS FOLDER" SCRIPTS
 		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'scripts/'))
@@ -515,7 +634,7 @@ class PlayState extends MusicBeatState
 			}
 		#end
 			
-		camPos = FlxPoint.get(girlfriendCameraOffset[0], girlfriendCameraOffset[1]);
+		var camPos:FlxPoint = FlxPoint.get(girlfriendCameraOffset[0], girlfriendCameraOffset[1]);
 		if(gf != null)
 		{
 			camPos.x += gf.getGraphicMidpoint().x + gf.cameraPosition[0];
@@ -545,11 +664,7 @@ class PlayState extends MusicBeatState
 		add(comboGroup);
 		add(uiGroup);
 		add(noteGroup);
-	}
 
-	// PHASE 3: time bar + generateSong (nặng nhất) + camera
-	function createPhaseChart():Void
-	{
 		Conductor.songPosition = -Conductor.crochet * 5 + Conductor.offset;
 		var showTime:Bool = (ClientPrefs.data.timeBarType != 'Disabled');
 		timeTxt = new FlxText(STRUM_X + (FlxG.width / 2) - 248, 19, 400, "", 32);
@@ -598,11 +713,7 @@ class PlayState extends MusicBeatState
 
 		FlxG.worldBounds.set(0, 0, FlxG.width, FlxG.height);
 		moveCameraSection();
-	}
 
-	// PHASE 4: HUD (healthbar/icons/score) + notetype/event/song scripts + mobile controls
-	function createPhaseHud():Void
-	{
 		healthBar = new Bar(0, FlxG.height * (!ClientPrefs.data.downScroll ? 0.89 : 0.11), 'healthBar', function() return health, 0, 2);
 		healthBar.screenCenter(X);
 		healthBar.leftToRight = false;
@@ -704,11 +815,7 @@ class PlayState extends MusicBeatState
 			for (event in eventNotes) event.strumTime -= eventEarlyTrigger(event);
 			eventNotes.sort(sortByTime);
 		}
-	}
 
-	// PHASE 5: start countdown + precache + onCreatePost + hoàn tất
-	function createPhaseFinish():Void
-	{
 		startCallback();
 		RecalculateRating(false, false);
 
@@ -746,99 +853,6 @@ class PlayState extends MusicBeatState
 		cachePopUpScore();
 
 		if(eventNotes.length < 1) checkEventNote();
-	}
-
-	// ===== Helpers cho phased creation =====
-
-	function applyPhaseProgress(k:Int):Void
-	{
-		if(overlay == null) return;
-		// status mô tả phase SẮP chạy (sau phase k)
-		switch(k)
-		{
-			case 0: overlay.setProgress(0.10, 'Preparing stage...');
-			case 1: overlay.setProgress(0.30, 'Loading scripts...');
-			case 2: overlay.setProgress(0.50, 'Generating chart...');
-			case 3: overlay.setProgress(0.70, 'Preparing HUD...');
-			case 4: overlay.setProgress(0.88, 'Finalizing gameplay...');
-			case 5: overlay.setProgress(1.00, 'Ready!');
-		}
-	}
-
-	function initLoadingOverlay():Void
-	{
-		camLoad = new FlxCamera();
-		camLoad.bgColor.alpha = 0; // trong suốt — bg đen nằm trong overlay
-		FlxG.cameras.add(camLoad, false);
-
-		overlay = new LoadingOverlay(camLoad);
-		overlay.onFaded = function() { overlayPendingRemove = true; };
-		add(overlay);
-		keepOverlayOnTop();
-	}
-
-	// Camera add sau (camHUD/touchpad/lua camera...) sẽ render đè overlay → đẩy camLoad về cuối
-	function keepOverlayOnTop():Void
-	{
-		if(camLoad == null) return;
-		var list:Array<FlxCamera> = FlxG.cameras.list;
-		if(list.length > 0 && list[list.length - 1] != camLoad)
-		{
-			list.remove(camLoad);
-			list.push(camLoad);
-		}
-	}
-
-	function runNextCreationPhase():Void
-	{
-		if(creationComplete || creationPhase < 1 || creationPhase > 5) return;
-		var phase:Int = creationPhase;
-		try
-		{
-			switch(phase)
-			{
-				case 1: createPhaseCharacters();
-				case 2: createPhaseScripts();
-				case 3: createPhaseChart();
-				case 4: createPhaseHud();
-				case 5: createPhaseFinish();
-			}
-		}
-		catch(e:Dynamic)
-		{
-			// Không để 1 phase lỗi làm treo màn loading — log và đi tiếp
-			trace('PlayState create phase $phase failed: $e');
-		}
-		creationPhase = phase + 1;
-		keepOverlayOnTop();
-		applyPhaseProgress(phase);
-
-		if(creationPhase > 5)
-		{
-			creationComplete = true;
-			if(overlay != null) overlay.beginFade();
-		}
-	}
-
-	function removeLoadingOverlay():Void
-	{
-		overlayPendingRemove = false;
-		if(overlay != null)
-		{
-			remove(overlay);
-			overlay.destroy();
-			overlay = null;
-		}
-		if(camLoad != null)
-		{
-			// pattern như MusicBeatState/FunkinLua: remove khỏi list rồi destroy (an toàn cả 2 hướng)
-			if(FlxG.cameras.list.contains(camLoad))
-			{
-				FlxG.cameras.remove(camLoad);
-				camLoad.destroy();
-			}
-			camLoad = null;
-		}
 	}
 
 	function set_songSpeed(value:Float):Float
@@ -1937,22 +1951,6 @@ class PlayState extends MusicBeatState
 
 	override public function update(elapsed:Float)
 	{
-		// Chưa khởi tạo xong → chỉ chạy phase kế + update overlay, KHÔNG update gameplay
-		// (boyfriend/healthBar... chưa tồn tại, đụng vào là null crash)
-		if(!creationComplete)
-		{
-			keepOverlayOnTop();
-			if(overlay != null) overlay.update(elapsed);
-			runNextCreationPhase();
-			return;
-		}
-
-		// Overlay fade xong → gỡ camera + sprite.
-		// CHỜ: subState đóng (CustomFadeTransition bám camera cuối ds = camLoad),
-		// và không có cutscene/video đang chạy (VideoSprite cũng bám camera cuối ds).
-		if(overlayPendingRemove && subState == null && !inCutscene && videoCutscene == null)
-			removeLoadingOverlay();
-
 		if(!inCutscene && !paused && !freezeCamera) {
 			FlxG.camera.followLerp = 0.04 * cameraSpeed * playbackRate;
 			var idleAnim:Bool = (boyfriend.getAnimationName().startsWith('idle') || boyfriend.getAnimationName().startsWith('danceLeft') || boyfriend.getAnimationName().startsWith('danceRight'));
@@ -3546,19 +3544,7 @@ class PlayState extends MusicBeatState
 	}
 
 	override function destroy() {
-		// Loading overlay: gỡ camera ngay cả khi bị destroy lúc đang khởi tạo.
-		// (overlay là member → super.destroy() tự hủy)
-		if(camLoad != null)
-		{
-			if(FlxG.cameras.list.contains(camLoad))
-			{
-				FlxG.cameras.remove(camLoad);
-				camLoad.destroy();
-			}
-			camLoad = null;
-		}
-		overlay = null;
-		overlayPendingRemove = false;
+		backend.GameSize.leavePlayState();
 
 		if (psychlua.CustomSubstate.instance != null)
 		{

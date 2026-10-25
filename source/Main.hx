@@ -179,12 +179,8 @@ class Main extends Sprite
 		if (FlxG.save.data != null && FlxG.save.data.wideScreen != null)
 			expandWidth = FlxG.save.data.wideScreen;
 
-		// Không CustomBuild → không expand logical size (giữ 1280x720 chuẩn)
-		if (!Mods.customBuild)
-		{
-			nativeFull = false;
-			expandWidth = false;
-		}
+		// CustomBuild chỉ còn ảnh hưởng PlayState (xem backend/GameSize.hx):
+		// mọi state khác luôn dùng size đã expand theo setting.
 
 		var stageW:Int = Lib.current.stage.stageWidth;
 		var stageH:Int = Lib.current.stage.stageHeight;
@@ -202,6 +198,9 @@ class Main extends Sprite
 			trace('[WideScreen] Expanded logical size: ${gameW}x${gameH} (device ${stageW}x${stageH})');
 		}
 		#end
+
+		backend.GameSize.baseW = gameW;
+		backend.GameSize.baseH = gameH;
 
 		addChild(new FlxGame(gameW, gameH, #if COPYSTATE_ALLOWED !CopyState.checkExistingFiles() ? CopyState : #end game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
