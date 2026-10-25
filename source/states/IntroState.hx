@@ -93,6 +93,7 @@ class IntroState extends MusicBeatState
 
 		#if sys dbg('[IntroState] Playing intro video: ' + videoFile); #end
 		videoSprite = new VideoSprite(videoFile, false, true); // skippable
+		videoSprite.keepNativeSize = true; // intro: không resize video
 		if (skipTitle)
 		{
 			// Nối tiếp intro: mute video + phát freakyMenu ngay dưới intro

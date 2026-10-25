@@ -22,6 +22,9 @@ class VideoSprite extends FlxSpriteGroup {
 
 	public var waiting:Bool = false;
 
+	/** true: không scale video lên (giữ size gốc, chỉ thu nhỏ nếu lớn hơn màn hình). Đặt trước khi play(). */
+	public var keepNativeSize:Bool = false;
+
 	public function new(videoName:String, isWaiting:Bool, canSkip:Bool = false, shouldLoop:Dynamic = false) {
 		super();
 
@@ -58,6 +61,20 @@ class VideoSprite extends FlxSpriteGroup {
 			videoSprite.scale.set(FlxG.width / wd, FlxG.height / hg);
 			#end
 			*/
+			if(keepNativeSize)
+			{
+				// Không upscale (tránh mất chất lượng): giữ size gốc, chỉ thu nhỏ nếu video lớn hơn màn hình
+				var fw:Float = videoSprite.frameWidth;
+				var fh:Float = videoSprite.frameHeight;
+				var fit:Float = (fw > 0 && fh > 0) ? Math.min(1, Math.min(FlxG.width / fw, FlxG.height / fh)) : 1;
+				videoSprite.scale.set(fit, fit);
+				videoSprite.updateHitbox();
+				videoSprite.screenCenter();
+				videoSprite.x = Math.round(videoSprite.x);
+				videoSprite.y = Math.round(videoSprite.y);
+				if(fit == 1) videoSprite.antialiasing = false;
+				return;
+			}
 			videoSprite.setGraphicSize(FlxG.width);
 			videoSprite.updateHitbox();
 			videoSprite.screenCenter();
