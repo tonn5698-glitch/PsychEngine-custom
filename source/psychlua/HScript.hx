@@ -179,6 +179,9 @@ class HScript extends Iris
 		// CNE shim classes
 		set('FunkinText', funkin.backend.FunkinText);
 		set('FunkinSprite', funkin.backend.FunkinSprite);
+		#if hxvlc
+		set('Video4', funkin.backend.Video4);
+		#end
 		set('FlxBackdrop', flixel.addons.display.FlxBackdrop);
 		#if (!flash && sys)
 		set('FlxRuntimeShader', flixel.addons.display.FlxRuntimeShader);
