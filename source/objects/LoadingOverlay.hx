@@ -2,6 +2,7 @@ package objects;
 
 import backend.Mods;
 import backend.Paths;
+import flixel.FlxBasic;
 import mobile.backend.TouchUtil;
 #if MODS_ALLOWED
 import sys.FileSystem;
@@ -182,7 +183,7 @@ class LoadingOverlay extends FlxSpriteGroup
 			try
 			{
 				if (customScript.exists('onLoadingCompleted')) customScript.call('onLoadingCompleted');
-				if (customScript.exists('waitForContinue') && customScript.call('waitForContinue') == true)
+				if (customScript.exists('waitForContinue') && customScript.call('waitForContinue').returnValue == true)
 				{
 					awaitingContinue = true;
 					stopBounce();
