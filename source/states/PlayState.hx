@@ -712,7 +712,6 @@ class PlayState extends MusicBeatState
 	// PHASE 5: start countdown + precache + onCreatePost + hoàn tất
 	function createPhaseFinish():Void
 	{
-		startCallback();
 		RecalculateRating(false, false);
 
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
@@ -819,7 +818,8 @@ class PlayState extends MusicBeatState
 		if(creationPhase > 5)
 		{
 			creationComplete = true;
-			if(overlay != null) overlay.beginFade();
+			if(overlay != null) overlay.loadingCompleted();
+			else if (startCallback != null) startCallback();
 		}
 	}
 
@@ -829,9 +829,11 @@ class PlayState extends MusicBeatState
 		if(overlay != null)
 		{
 			remove(overlay);
+			overlay.disposeCustomScript();
 			overlay.destroy();
 			overlay = null;
 		}
+		if (startCallback != null) startCallback();
 		if(camLoad != null)
 		{
 			// pattern như MusicBeatState/FunkinLua: remove khỏi list rồi destroy (an toàn cả 2 hướng)

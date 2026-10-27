@@ -54,6 +54,7 @@ class LoadingState extends MusicBeatState
 	
 	var target:FlxState = null;
 	var stopMusic:Bool = false;
+	var dontUpdate:Bool = false;
 
 	var barGroup:FlxSpriteGroup;
 	var bar:FlxSprite;
@@ -62,8 +63,7 @@ class LoadingState extends MusicBeatState
 	var curPercent:Float = 0;
 	var stateChangeDelay:Float = 0;
 	var loadingElapsed:Float = 0;
-	// Assets đã 100% — chờ script shouldContinue() (nếu mod có) cho phép switch
-	var readyToContinue:Bool = false;
+
 
 	#if PSYCH_WATERMARKS
 	var logo:FlxSprite;
@@ -105,9 +105,7 @@ class LoadingState extends MusicBeatState
 		#if HSCRIPT_ALLOWED
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.trim().length > 0)
 		{
-			// Paths.mods() → đúng root hiện tại (/sdcard/.PsychEngine/<root>/...) thay vì
-			// path tương đối 'mods/...' (trên Android cwd = app files dir → sai chỗ)
-			var scriptPath:String = Paths.mods('data/LoadingScreen.hx');
+			var scriptPath:String = 'mods/${Mods.currentModDirectory}/data/LoadingScreen.hx'; //mods/My-Mod/data/LoadingScreen.hx
 			if(FileSystem.exists(scriptPath))
 			{
 				try
@@ -185,11 +183,14 @@ class LoadingState extends MusicBeatState
 		#end
 		applyLoadingScreenConfig(barBack, bar);
 
+
 		super.create();
 
-		// Tải xong ngay từ đầu → không auto switch nữa, chờ shouldContinue() (script) cho phép
 		if (stateChangeDelay <= 0 && checkLoaded())
-			readyToContinue = true;
+		{
+			dontUpdate = true;
+			onLoad();
+		}
 	}
 
 	// P2: declarative loading-screen config. Reads mods/<ModDir>/data/loadingScreen.json
@@ -198,7 +199,7 @@ class LoadingState extends MusicBeatState
 	{
 		if (Mods.currentModDirectory == null || Mods.currentModDirectory.trim().length < 1) return;
 
-		var cfgPath:String = Paths.mods('data/loadingScreen.json');
+		var cfgPath:String = 'mods/${Mods.currentModDirectory}/data/loadingScreen.json';
 		if (!FileSystem.exists(cfgPath)) return;
 
 		var config:Dynamic = null;
@@ -262,28 +263,23 @@ class LoadingState extends MusicBeatState
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
+		if (dontUpdate) return;
 
 		if (!transitioning)
 		{
 			loadingElapsed += elapsed;
 			var assetsReady:Bool = checkLoaded();
-			var assetPercent:Float = loadMax > 0 ? Math.min(1, loaded / loadMax) : 1;
-			intendedPercent = assetPercent;
+			intendedPercent = loadMax > 0 ? Math.min(1, loaded / loadMax) : 1;
 
-			if (assetsReady && !readyToContinue)
+			if (!finishedLoading && assetsReady)
 			{
-				if(stateChangeDelay <= 0) readyToContinue = true;
+				if(stateChangeDelay <= 0)
+				{
+					transitioning = true;
+					onLoad();
+					return;
+				}
 				else stateChangeDelay = Math.max(0, stateChangeDelay - elapsed);
-			}
-
-			// Switch sang PlayState khi: assets 100% VÀ script cho phép
-			// (script không có shouldContinue() → canProceed() luôn true = auto như cũ)
-			if (readyToContinue && canProceed())
-			{
-				transitioning = true;
-				// fade đen trước khi switch → không có frame đen nhấp nháy
-				FlxG.camera.fade(FlxColor.BLACK, 0.3, false, onLoad, true);
-				return;
 			}
 		}
 
@@ -317,10 +313,7 @@ class LoadingState extends MusicBeatState
 			case 2:
 				dots = '...';
 		}
-		// Chỉ hiện "click to continue" khi script thật sự đang CHỜ (shouldContinue() == false)
-		var statusText:String = (readyToContinue && !canProceed())
-			? Language.getPhrase('loading_continue', 'Load finished — click to continue')
-			: Language.getPhrase('now_loading', 'Now Loading{1}', [dots]);
+		var statusText:String = Language.getPhrase('now_loading', 'Now Loading{1}', [dots]);
 
 		if(loadingElapsed > 0.5 && intendedPercent > 0.02 && intendedPercent < 0.999)
 		{
@@ -401,33 +394,10 @@ class LoadingState extends MusicBeatState
 	#end
 	
 	var finishedLoading:Bool = false;
-
-	/**
-	 * Hook shouldContinue() cho softcoded loading screen (mods/<Mod>/data/LoadingScreen.hx):
-	 * script trả false → engine CHỜ (vd: đang đợi người chơi bấm "click to continue").
-	 * Không có hook, hoặc script lỗi → trả về true = switch ngay như mặc định.
-	 */
-	function canProceed():Bool
-	{
-		#if HSCRIPT_ALLOWED
-		if(hscript != null && hscript.exists('shouldContinue'))
-		{
-			try
-			{
-				var v:Dynamic = hscript.call('shouldContinue');
-				if(v == false || v == 0) return false;
-			}
-			catch(e:Dynamic)
-			{
-				trace('LoadingScreen shouldContinue() error: $e');
-			}
-		}
-		#end
-		return true;
-	}
-
 	function onLoad()
 	{
+		// Custom overlay scripts can preload images/fonts before PlayState blocks the main thread.
+		objects.LoadingOverlay.preloadForCurrentMod();
 		_loaded();
 
 		if (stopMusic && FlxG.sound.music != null)

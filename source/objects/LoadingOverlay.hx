@@ -1,5 +1,15 @@
 package objects;
 
+import backend.Mods;
+import backend.Paths;
+import mobile.backend.TouchUtil;
+#if MODS_ALLOWED
+import sys.FileSystem;
+#end
+#if HSCRIPT_ALLOWED
+import psychlua.HScript;
+#end
+
 /**
  * Overlay hiển thị trong lúc PlayState khởi tạo theo từng phase (xem PlayState.create()/runNextCreationPhase).
  * Nằm trên camera riêng (camLoad) nên che phủ toàn bộ stage/HUD đang được dựng dở.
@@ -8,6 +18,11 @@ package objects;
 class LoadingOverlay extends FlxSpriteGroup
 {
 	public var onFaded:Void->Void = null;
+	#if HSCRIPT_ALLOWED
+	var customScript:HScript;
+	#end
+	var awaitingContinue:Bool = false;
+	var completedNotified:Bool = false;
 
 	var bg:FlxSprite;
 	var logo:FlxSprite;
@@ -84,6 +99,111 @@ class LoadingOverlay extends FlxSpriteGroup
 			for (m in members)
 				if (m != null) m.cameras = [cam];
 		}
+		loadCustomScript();
+	}
+
+	/** Preload callback is run by LoadingState before PlayState is created. */
+	public static function preloadForCurrentMod():Void
+	{
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED)
+		var path:String = resolveCustomScriptPath();
+		if (path == null) return;
+		var preloadScript:HScript = null;
+		try
+		{
+			preloadScript = new HScript(null, path);
+			if (preloadScript.exists('onPreload')) preloadScript.call('onPreload');
+		}
+		catch(e:Dynamic) trace('[LoadingOverlay] onPreload failed: ' + e);
+		if (preloadScript != null) preloadScript.destroy();
+		#end
+	}
+
+	#if (MODS_ALLOWED && HSCRIPT_ALLOWED)
+	static function resolveCustomScriptPath():Null<String>
+	{
+		var mod:String = Mods.currentModDirectory;
+		if (mod == null || mod.length == 0) return null;
+		for (root in Paths.modRootDirs)
+		{
+			var base:String = Paths.modsRootByName(root) + mod + '/CustomStates/loading-overlay/';
+			for (file in ['OverlayLoading.hx', 'main.hx', 'loading-overlay.hx'])
+			{
+				var candidate:String = base + file;
+				if (FileSystem.exists(candidate) && !FileSystem.isDirectory(candidate)) return candidate;
+			}
+		}
+		return null;
+	}
+	#end
+
+	function loadCustomScript():Void
+	{
+		#if (MODS_ALLOWED && HSCRIPT_ALLOWED)
+		var path:String = resolveCustomScriptPath();
+		if (path == null) return;
+		try
+		{
+			customScript = new HScript(null, path);
+			customScript.set('overlay', this);
+			customScript.set('addObject', function(object:FlxBasic) {
+				if (object == null) return null;
+				add(cast object);
+				object.cameras = cameras;
+				return object;
+			});
+			customScript.set('removeObject', function(object:FlxBasic) {
+				if (object != null) remove(cast object, true);
+			});
+			customScript.set('background', bg);
+			customScript.set('logo', logo);
+			customScript.set('statusText', statusText);
+			customScript.set('percentText', percentText);
+			customScript.set('bar', bar);
+			customScript.set('barBack', barBack);
+			if (customScript.exists('onCreate')) customScript.call('onCreate');
+		}
+		catch(e:Dynamic)
+		{
+			trace('[LoadingOverlay] custom script failed: ' + e);
+			if (customScript != null) customScript.destroy();
+			customScript = null;
+		}
+		#end
+	}
+
+	public function loadingCompleted():Void
+	{
+		if (completedNotified) return;
+		completedNotified = true;
+		#if HSCRIPT_ALLOWED
+		if (customScript != null)
+		{
+			try
+			{
+				if (customScript.exists('onLoadingCompleted')) customScript.call('onLoadingCompleted');
+				if (customScript.exists('waitForContinue') && customScript.call('waitForContinue') == true)
+				{
+					awaitingContinue = true;
+					stopBounce();
+					return;
+				}
+			}
+			catch(e:Dynamic) trace('[LoadingOverlay] completion callback failed: ' + e);
+		}
+		#end
+		beginFade();
+	}
+
+	function continueFromOverlay():Void
+	{
+		if (!awaitingContinue || fading) return;
+		awaitingContinue = false;
+		#if HSCRIPT_ALLOWED
+		if (customScript != null && customScript.exists('onContinue'))
+			try customScript.call('onContinue') catch(e:Dynamic) trace('[LoadingOverlay] onContinue failed: ' + e);
+		#end
+		beginFade();
 	}
 
 	public function setProgress(percent:Float, status:String):Void
@@ -109,6 +229,12 @@ class LoadingOverlay extends FlxSpriteGroup
 	{
 		super.update(elapsed);
 		time += elapsed;
+		#if HSCRIPT_ALLOWED
+		if (customScript != null && customScript.exists('onUpdate'))
+			try customScript.call('onUpdate', [elapsed]) catch(e:Dynamic) trace('[LoadingOverlay] onUpdate failed: ' + e);
+		#end
+		if (awaitingContinue && (FlxG.keys.justPressed.ENTER || FlxG.keys.justPressed.SPACE || FlxG.mouse.justPressed || TouchUtil.justPressed))
+			continueFromOverlay();
 
 		if (bouncing && logo != null)
 		{
@@ -142,5 +268,17 @@ class LoadingOverlay extends FlxSpriteGroup
 				cb();
 			}
 		}
+	}
+
+	public function disposeCustomScript():Void
+	{
+		#if HSCRIPT_ALLOWED
+		if (customScript != null)
+		{
+			try if (customScript.exists('onDestroy')) customScript.call('onDestroy') catch(e:Dynamic) trace('[LoadingOverlay] onDestroy failed: ' + e);
+			customScript.destroy();
+			customScript = null;
+		}
+		#end
 	}
 }
