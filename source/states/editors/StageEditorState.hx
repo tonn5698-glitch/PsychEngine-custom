@@ -125,8 +125,18 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
 		addTouchPadCamera();
+		placeTouchButtonG();
 
 		super.create();
+	}
+
+	/** Nút G của touchpad bị đè lên tab Stage → dời sang trái cạnh các panel UI bên phải. */
+	function placeTouchButtonG()
+	{
+		if(touchPad == null || touchPad.buttonG == null || UI_stagebox == null || UI_box == null) return;
+		var g:TouchButton = touchPad.buttonG;
+		g.x = UI_box.x - g.width - 10;
+		g.y = UI_stagebox.y;
 	}
 
 	function loadJsonAssetDirectory()
@@ -1647,6 +1657,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		removeTouchPad();
 		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
 		addTouchPadCamera();
+		placeTouchButtonG();
 		persistentUpdate = true;
 	}
 
