@@ -52,11 +52,14 @@ jobs:
         if: contains(inputs.name, 'Linux')
         run: sudo apt install libvlc-dev libvlccore-dev
 
-      # Không cache ~/haxelib: các lib cài bằng git (hxcpp, lime, flixel...) bị upstream đổi/force-push
-      # sẽ làm `git pull` trong bước cài lib báo "divergent branches" (exit 128). Cài mới mỗi lần cho chắc.
-      - name: Git config
-        shell: bash
-        run: git config --global pull.rebase false
+      # Cache dependencies between source-only builds. The exact key changes when
+      # dependency pins, project libraries, or this install workflow changes.
+      # No restore-keys: never reuse a cache built from different dependency definitions.
+      - name: Cache haxelib
+        uses: actions/cache@v5
+        with:
+          path: ~/haxelib
+          key: haxelib-${{ runner.os }}-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/unix.sh', 'setup/windows.bat', 'Project.xml', '.github/workflows/build.yml') }}
 
       - name: Install Libraries
         run: ${{ inputs.setupCommand }}
@@ -64,7 +67,9 @@ jobs:
       - name: Install hxdr_libs (mp3 support)
         shell: bash
         run: |
-          haxelib git hxdr_libs https://github.com/MAJigsaw77/hxdr_libs.git
+          if [ ! -d "$HOME/haxelib/hxdr_libs/git" ]; then
+            haxelib git hxdr_libs https://github.com/MAJigsaw77/hxdr_libs.git
+          fi
           # thêm vào Project.xml nếu chưa có (để define hxdr_libs được bật)
           grep -q 'hxdr_libs' Project.xml || perl -0pi -e 's#</project>#\t<haxelib name="hxdr_libs" />\n</project>#' Project.xml
           grep -n 'hxdr_libs' Project.xml

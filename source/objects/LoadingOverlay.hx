@@ -123,12 +123,8 @@ class LoadingOverlay extends FlxSpriteGroup
 	#if (MODS_ALLOWED && HSCRIPT_ALLOWED)
 	static function resolveCustomScriptPath():Null<String>
 	{
-		var modsToCheck:Array<String> = [];
-		if (Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
-			modsToCheck.push(Mods.currentModDirectory);
-		// LoadLogo is a global loading-overlay mod: check it before the song mod.
-		if (!modsToCheck.contains('LoadLogo')) modsToCheck.insert(0, 'LoadLogo');
-		for (mod in modsToCheck)
+		var mod:String = Mods.currentModDirectory;
+		if (mod == null || mod.length == 0) return null;
 		for (root in Paths.modRootDirs)
 		{
 			var base:String = Paths.modsRootByName(root) + mod + '/CustomStates/loading-overlay/';

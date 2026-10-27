@@ -1926,7 +1926,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 	
 	public function drawDebugOnCamera(spr:FlxSprite):Void
 	{
-		if (spr == null || !spr.isOnScreen(FlxG.camera))
+		if (spr == null || spr.graphic == null || spr.graphic.bitmap == null || spr.frame == null || !spr.isOnScreen(FlxG.camera))
 			return;
 
 		@:privateAccess
@@ -2443,7 +2443,10 @@ class StageEditorMetaSprite
 
 	public function draw(curFilters:LoadFilters)
 	{
-		if(sprite == null || !sprite.exists) return;
+		if(sprite == null || !sprite.exists || !sprite.visible) return;
+		// Stage assets/characters can resolve to a sprite without a valid texture frame.
+		// Do not pass such sprites to FlxDrawQuadsItem, which crashes on Android.
+		if(sprite.graphic == null || sprite.graphic.bitmap == null || sprite.frame == null) return;
 		if((curFilters & filters) != 0 || StageData.reservedNames.contains(type) || type == 'lua')
 		{
 			if(editorAlpha < 1)
