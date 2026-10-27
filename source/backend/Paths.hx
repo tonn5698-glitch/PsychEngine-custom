@@ -17,6 +17,7 @@ import lime.utils.Assets;
 import flash.media.Sound;
 
 import haxe.Json;
+import haxe.io.Bytes;
 
 
 #if MODS_ALLOWED
@@ -415,6 +416,22 @@ class Paths
 
 	public static function fileExists(key:String, type:AssetType, ?ignoreMods:Bool = false, ?parentFolder:String = null)
 	{
+		if(fileExistsRaw(key, type, ignoreMods, parentFolder)) return true;
+
+		#if hxdr_libs
+		// âm thanh: không có .ogg thì chấp nhận .mp3
+		if(type == SOUND && key.endsWith('.$SOUND_EXT'))
+		{
+			var mp3Key = key.substr(0, key.length - SOUND_EXT.length) + 'mp3';
+			var mp3Path = getPath(mp3Key, type, parentFolder, !ignoreMods);
+			if(fileExistsRaw(mp3Key, type, ignoreMods, parentFolder) || OpenFlAssets.exists(mp3Path, SOUND)) return true;
+		}
+		#end
+		return false;
+	}
+
+	static function fileExistsRaw(key:String, type:AssetType, ?ignoreMods:Bool = false, ?parentFolder:String = null)
+	{
 		#if MODS_ALLOWED
 		if(!ignoreMods)
 		{
@@ -542,6 +559,53 @@ class Paths
 	}
 
 	public static var currentTrackedSounds:Map<String, Sound> = [];
+
+	#if sys
+	/**
+	 * Tìm file âm thanh thật: ưu tiên .ogg, không có thì thử .mp3 (cần haxelib hxdr_libs).
+	 * Trả về null nếu không có file nào. Cache vẫn dùng key .ogg nên mọi nơi khác không cần đổi.
+	 */
+	public static function resolveSoundFile(key:String, ?path:String, ?modsAllowed:Bool = true, ?oggFile:String = null):String
+	{
+		if(oggFile == null)
+			oggFile = getPath(Language.getFileTranslation(key) + '.$SOUND_EXT', SOUND, path, modsAllowed);
+		if(FileSystem.exists(oggFile) || OpenFlAssets.exists(oggFile, SOUND)) return oggFile;
+
+		#if hxdr_libs
+		var mp3File:String = getPath(Language.getFileTranslation(key) + '.mp3', SOUND, path, modsAllowed);
+		if(FileSystem.exists(mp3File) || OpenFlAssets.exists(mp3File, SOUND)) return mp3File;
+		#end
+		return null;
+	}
+
+	/** Load 1 file âm thanh; .mp3 được decode bằng hxdr_libs (dr_mp3), còn lại dùng Sound.fromFile. */
+	public static function loadSoundFile(file:String):Sound
+	{
+		#if hxdr_libs
+		if(file.toLowerCase().endsWith('.mp3'))
+		{
+			var bytes:Bytes = null;
+			try {
+				if(OpenFlAssets.exists(file, SOUND) || OpenFlAssets.exists(file))
+					bytes = OpenFlAssets.getBytes(file);
+				else if(FileSystem.exists(file))
+					bytes = File.getBytes(file);
+			} catch(e:Dynamic) {}
+
+			if(bytes != null)
+			{
+				var buffer = hxdr_libs.Mp3.fromBytes(bytes);
+				if(buffer != null && buffer.data != null && buffer.data.length > 0)
+					return Sound.fromAudioBuffer(buffer);
+			}
+
+			return Sound.fromAudioBuffer(hxdr_libs.Mp3.fromFile(file));
+		}
+		#end
+		return Sound.fromFile(file);
+	}
+	#end
+
 	public static function returnSound(key:String, ?path:String, ?modsAllowed:Bool = true, ?beepOnNull:Bool = true)
 	{
 		var file:String = getPath(Language.getFileTranslation(key) + '.$SOUND_EXT', SOUND, path, modsAllowed);
@@ -550,8 +614,9 @@ class Paths
 		if(!currentTrackedSounds.exists(file))
 		{
 			#if sys
-			if(FileSystem.exists(file))
-				currentTrackedSounds.set(file, Sound.fromFile(file));
+			var realFile:String = resolveSoundFile(key, path, modsAllowed, file);
+			if(realFile != null)
+				currentTrackedSounds.set(file, loadSoundFile(realFile));
 			#else
 			if(OpenFlAssets.exists(file, SOUND))
 				currentTrackedSounds.set(file, OpenFlAssets.getSound(file));

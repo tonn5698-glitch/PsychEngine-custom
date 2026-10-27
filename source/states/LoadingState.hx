@@ -933,9 +933,12 @@ class LoadingState extends MusicBeatState
 		//trace('precaching sound: $file');
 		if(!Paths.currentTrackedSounds.exists(file))
 		{
-			if (#if sys FileSystem.exists(file) || #end OpenFlAssets.exists(file, SOUND))
+			#if sys
+			var realFile:String = Paths.resolveSoundFile(key, path, modsAllowed, file); // .ogg, không có thì .mp3
+			#end
+			if (#if sys realFile != null || #end OpenFlAssets.exists(file, SOUND))
 			{
-				var sound:Sound = #if sys Sound.fromFile(file) #else OpenFlAssets.getSound(file, false) #end;
+				var sound:Sound = #if sys (realFile != null ? Paths.loadSoundFile(realFile) : Sound.fromFile(file)) #else OpenFlAssets.getSound(file, false) #end;
 				if (mutex != null) mutex.acquire();
 				Paths.currentTrackedSounds.set(file, sound);
 				if (mutex != null) mutex.release();
