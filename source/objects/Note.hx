@@ -417,6 +417,12 @@ class Note extends FlxSprite
 			}
 		} else {
 			frames = Paths.getSparrowAtlas(skin);
+			if(frames == null)
+			{
+				// skin trong chart (arrowSkin) không có file → dùng skin mặc định thay vì crash
+				trace('[Note] Skin "$skin" not found, falling back to "$defaultNoteSkin"');
+				frames = Paths.getSparrowAtlas(defaultNoteSkin);
+			}
 			loadNoteAnims();
 			if(!isSustainNote)
 			{

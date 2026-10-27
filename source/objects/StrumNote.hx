@@ -106,6 +106,11 @@ class StrumNote extends FlxSprite
 		else
 		{
 			frames = Paths.getSparrowAtlas(texture);
+			if(frames == null)
+			{
+				trace('[StrumNote] Skin "$texture" not found, falling back to "${Note.defaultNoteSkin}"');
+				frames = Paths.getSparrowAtlas(Note.defaultNoteSkin);
+			}
 			// Base 4 arrow colors (always present on NOTE_assets).
 			animation.addByPrefix('green', 'arrowUP');
 			animation.addByPrefix('blue', 'arrowDOWN');

@@ -33,6 +33,9 @@ class CrashHandler
 	public static function init():Void
 	{
 		openfl.Lib.current.loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
+		// Poll mỗi frame độc lập với state hiện tại: nếu state hỏng (lỗi trong create/update) thì
+		// MusicBeatState.update không chạy nữa, nên không thể chờ nó xử lý crash.
+		openfl.Lib.current.addEventListener(openfl.events.Event.ENTER_FRAME, function(_) processPendingCrash());
 		#if cpp
 		untyped __global__.__hxcpp_set_critical_error_handler(onError);
 		#elseif hl
@@ -41,41 +44,65 @@ class CrashHandler
 	}
 
 	/**
-	 * Gọi mỗi frame từ MusicBeatState.update() để chuyển state an toàn.
+	 * Gọi mỗi frame (ENTER_FRAME) để chuyển sang CrashHandlerState an toàn.
+	 * Không bao giờ thoát app: nếu không chuyển được thì chỉ log.
 	 */
 	public static function processPendingCrash():Void
 	{
 		if (!pendingCrash) return;
 		pendingCrash = false;
-		crashHandlerActive = true;
+		checkPendingCrash = false;
 
-		try {
-			// Dọn cache an toàn
-			try { FlxG.bitmap.clearCache(); } catch (e:Dynamic) {}
-			try { FlxG.sound.music.stop(); } catch (e:Dynamic) {}
+		var crashState:states.CrashHandlerState = null;
+		try
+		{
+			crashState = new states.CrashHandlerState(pendingMsg, pendingStack);
+		}
+		catch (e:Dynamic)
+		{
+			trace('[CrashHandler] Failed to create CrashHandlerState: ' + e);
+			return;
+		}
 
-			FlxTransitionableState.skipNextTransIn = true;
-			FlxTransitionableState.skipNextTransOut = true;
-			MusicBeatState.switchState(new states.CrashHandlerState(pendingMsg, pendingStack));
-		} catch (e:Dynamic) {
-			trace('[CrashHandler] Failed to switch state: ' + e);
-			// Fallback: vẫn exit nếu không switch được
-			lime.system.System.exit(1);
+		try { FlxG.sound.music.stop(); } catch (e:Dynamic) {}
+		FlxTransitionableState.skipNextTransIn = true;
+		FlxTransitionableState.skipNextTransOut = true;
+
+		try
+		{
+			// State cũ có thể đã hỏng giữa chừng (vd: lỗi trong PlayState.create) nên:
+			// - tự destroy trong try/catch (flixel sẽ không phải destroy lại),
+			// - thay bằng state rỗng (state đã destroy có exists=false → FlxGame.update bỏ qua việc đổi state),
+			// - đặt thẳng state tiếp theo, bỏ qua transition của MusicBeatState.switchState.
+			@:privateAccess
+			{
+				var game = FlxG.game;
+				try { if (game._state != null) game._state.destroy(); } catch (e:Dynamic) { trace('[CrashHandler] Old state destroy failed: ' + e); }
+				game._state = new flixel.FlxState();
+				game._requestedState = crashState;
+			}
+		}
+		catch (e:Dynamic)
+		{
+			trace('[CrashHandler] Direct switch failed: ' + e);
+			try { FlxG.switchState(crashState); } catch (e2:Dynamic) { trace('[CrashHandler] FlxG.switchState failed: ' + e2); }
 		}
 	}
 
 	private static function onUncaughtError(e:UncaughtErrorEvent):Void
 	{
-		// Recursion protection
-		if (crashHandlerActive)
-		{
-			trace('[CrashHandler] Recursion detected, ignoring second crash');
-			return;
-		}
-
+		// LUÔN chặn lỗi (kể cả lỗi lặp lại mỗi frame của state hỏng) — không chặn thì runtime sẽ kill app
 		e.preventDefault();
 		e.stopPropagation();
 		e.stopImmediatePropagation();
+
+		// Recursion protection: các lỗi sau lỗi đầu tiên chỉ bị bỏ qua, không xử lý lại
+		if (crashHandlerActive)
+		{
+			trace('[CrashHandler] Repeated error ignored');
+			return;
+		}
+		crashHandlerActive = true;
 
 		// Capture error message
 		var m:String = 'Unknown error';
@@ -121,6 +148,7 @@ class CrashHandler
 	private static function onError(message:Dynamic):Void
 	{
 		if (crashHandlerActive) return;
+		crashHandlerActive = true;
 
 		var msg:String = 'Critical error';
 		var stackStr:String = '';
@@ -169,6 +197,26 @@ class CrashHandler
 		return lines.join('\n');
 	}
 
+	/** Nội dung đầy đủ của báo cáo crash (dùng cho file log và nút Copy). */
+	public static function buildReport(message:String, stack:String):String
+	{
+		return [
+			'---',
+			'PSYCH ENGINE CRASH REPORT',
+			'',
+			'Date: ' + Date.now().toString(),
+			'Platform: ' + #if android 'Android' #elseif desktop 'Desktop' #else 'Unknown' #end,
+			'Engine version: ' + states.MainMenuState.psychEngineVersion,
+			'',
+			'Exception:',
+			message,
+			'',
+			'Stack trace:',
+			stack,
+			'---'
+		].join('\n');
+	}
+
 	static function saveCrashLog(message:String, stack:String):Void
 	{
 		try {
@@ -188,21 +236,7 @@ class CrashHandler
 				StringTools.lpad(Std.string(now.getMinutes()), '0', 2) + '-' +
 				StringTools.lpad(Std.string(now.getSeconds()), '0', 2);
 
-			var content:String = [
-				'---',
-				'PSYCH ENGINE CRASH REPORT',
-				'',
-				'Date: ' + now.toString(),
-				'Platform: ' + #if android 'Android' #elseif desktop 'Desktop' #else 'Unknown' #end,
-				'Engine version: ' + states.MainMenuState.psychEngineVersion,
-				'',
-				'Exception:',
-				message,
-				'',
-				'Stack trace:',
-				stack,
-				'---'
-			].join('\n');
+			var content:String = buildReport(message, stack);
 
 			File.saveContent(folder + 'crash_' + ts + '.txt', content);
 			trace('[CrashHandler] Crash log saved to ' + folder);
