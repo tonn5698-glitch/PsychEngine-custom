@@ -39,14 +39,6 @@ jobs:
         with:
           haxe-version: ${{ env.HAXE_VERSION }}
 
-      - name: Cache haxelib
-        uses: actions/cache@v5
-        with:
-          path: ~/haxelib
-          key: haxelib-${{ runner.os }}-${{ hashFiles('setup/unix.sh', 'Project.xml') }}
-          restore-keys: |
-            haxelib-${{ runner.os }}-
-
       - name: Setup Android NDK
         if: inputs.name == 'Android'
         id: setup-ndk
@@ -59,6 +51,12 @@ jobs:
       - name: Install libVLC
         if: contains(inputs.name, 'Linux')
         run: sudo apt install libvlc-dev libvlccore-dev
+
+      # Không cache ~/haxelib: các lib cài bằng git (hxcpp, lime, flixel...) bị upstream đổi/force-push
+      # sẽ làm `git pull` trong bước cài lib báo "divergent branches" (exit 128). Cài mới mỗi lần cho chắc.
+      - name: Git config
+        shell: bash
+        run: git config --global pull.rebase false
 
       - name: Install Libraries
         run: ${{ inputs.setupCommand }}
