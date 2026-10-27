@@ -63,6 +63,14 @@ jobs:
       - name: Install Libraries
         run: ${{ inputs.setupCommand }}
 
+      - name: Install hxdr_libs (mp3 support)
+        shell: bash
+        run: |
+          haxelib git hxdr_libs https://github.com/MAJigsaw77/hxdr_libs.git
+          # thêm vào Project.xml nếu chưa có (để define hxdr_libs được bật)
+          grep -q 'hxdr_libs' Project.xml || perl -0pi -e 's#</project>#\t<haxelib name="hxdr_libs" />\n</project>#' Project.xml
+          grep -n 'hxdr_libs' Project.xml
+
       - name: Configure Android
         if: inputs.name == 'Android'
         run: |
