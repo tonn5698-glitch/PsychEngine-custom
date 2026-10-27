@@ -79,7 +79,7 @@ class CrashHandler
 				var game = FlxG.game;
 				try { if (game._state != null) game._state.destroy(); } catch (e:Dynamic) { trace('[CrashHandler] Old state destroy failed: ' + e); }
 				game._state = new flixel.FlxState();
-				game._requestedState = crashState;
+				FlxG.switchState(crashState);
 			}
 		}
 		catch (e:Dynamic)
