@@ -1269,11 +1269,66 @@ class FunkinLua {
 			else groupObj = LuaUtils.getObjectDirectly(group);
 
 			groupObj.remove(obj, true);
+			if(stagePreviewMode)
+			{
+				// stage editor tự quản lý danh sách sprite → báo cho editor gỡ bản preview
+				var st:Dynamic = MusicBeatState.getState();
+				var rmFn:Dynamic = st != null ? Reflect.field(st, 'removeStagePreviewLuaSprite') : null;
+				if(rmFn != null) Reflect.callMethod(st, rmFn, [obj]);
+			}
 			if(destroy)
 			{
 				MusicBeatState.getVariables().remove(tag);
 				obj.destroy();
 			}
+		});
+
+		// Layer: số lớn hơn = vẽ phía trước. Dùng chung hệ thống với "layer" trong stage JSON.
+		Lua_helper.add_callback(lua, "setObjectLayer", function(obj:String, layer:Int) {
+			if(stagePreviewMode)
+			{
+				var st:Dynamic = MusicBeatState.getState();
+				var fn:Dynamic = st != null ? Reflect.field(st, 'setStagePreviewLayer') : null;
+				if(fn != null) Reflect.callMethod(st, fn, [obj, layer]);
+				return;
+			}
+			var name:String = switch(obj.toLowerCase())
+			{
+				case 'boyfriend' | 'bf': 'boyfriendGroup';
+				case 'dad' | 'opponent': 'dadGroup';
+				case 'gf' | 'girlfriend': 'gfGroup';
+				default: obj;
+			};
+			var leObj:FlxBasic = LuaUtils.getObjectDirectly(name);
+			if(leObj == null)
+			{
+				luaTrace('setObjectLayer: Object $obj doesn\'t exist!', false, false, FlxColor.RED);
+				return;
+			}
+			var instance:Dynamic = CustomSubstate.instance != null ? CustomSubstate.instance : LuaUtils.getTargetInstance();
+			backend.StageLayers.setLayer(instance, leObj, layer);
+		});
+		Lua_helper.add_callback(lua, "getObjectLayer", function(obj:String) {
+			if(stagePreviewMode)
+			{
+				var st:Dynamic = MusicBeatState.getState();
+				var fn:Dynamic = st != null ? Reflect.field(st, 'getStagePreviewLayer') : null;
+				return (fn != null) ? Reflect.callMethod(st, fn, [obj]) : 0;
+			}
+			var name:String = switch(obj.toLowerCase())
+			{
+				case 'boyfriend' | 'bf': 'boyfriendGroup';
+				case 'dad' | 'opponent': 'dadGroup';
+				case 'gf' | 'girlfriend': 'gfGroup';
+				default: obj;
+			};
+			var leObj:FlxBasic = LuaUtils.getObjectDirectly(name);
+			if(leObj == null)
+			{
+				luaTrace('getObjectLayer: Object $obj doesn\'t exist!', false, false, FlxColor.RED);
+				return 0;
+			}
+			return backend.StageLayers.get(leObj);
 		});
 
 		Lua_helper.add_callback(lua, "luaSpriteExists", function(tag:String) {

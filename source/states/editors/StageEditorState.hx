@@ -52,6 +52,8 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 	#end
 	var luaStepStepper:PsychUINumericStepper;
 	var loadLuaCheckbox:PsychUICheckBox;
+	var layerStepper:PsychUINumericStepper;
+	var editorAlphaStepper:PsychUINumericStepper;
 
 	public function new(stageToLoad:String = 'stage', cachedJson:StageFile = null)
 	{
@@ -197,6 +199,11 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 	function updateSpriteList()
 	{
+		#if LUA_ALLOWED
+		// gỡ sạch lua sprite (và lua script) TRƯỚC khi destroy danh sách cũ, tránh bản sao mồ côi
+		unloadStageLua();
+		#end
+
 		for (spr in stageSprites)
 			if(spr != null && !StageData.reservedNames.contains(spr.type))
 				spr.sprite = FlxDestroyUtil.destroy(spr.sprite);
@@ -217,12 +224,50 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			if(!list.exists(character))
 				stageSprites.push(new StageEditorMetaSprite({type: character}, Reflect.field(this, character)));
 
+		sortByLayer(null, false);
 		updateSpriteListRadio();
+	}
 
+	/** Load lại lua (nếu checkbox bật) — chỉ gọi 1 lần ở cuối mỗi lần Reload/đổi stage. */
+	function reloadLuaIfEnabled()
+	{
 		#if LUA_ALLOWED
 		if(loadLuaCheckbox != null && loadLuaCheckbox.checked)
 			reloadStageLua();
 		#end
+	}
+
+	/** Giữ stageSprites luôn sắp theo layer tăng dần (ổn định). */
+	function sortByLayer(?sel:StageEditorMetaSprite, refresh:Bool = true)
+	{
+		var tmp:Array<{i:Int, s:StageEditorMetaSprite}> = [for (i => spr in stageSprites) {i: i, s: spr}];
+		tmp.sort(function(a, b):Int
+		{
+			var la:Int = a.s != null ? a.s.layer : 0;
+			var lb:Int = b.s != null ? b.s.layer : 0;
+			return la != lb ? (la < lb ? -1 : 1) : a.i - b.i;
+		});
+		stageSprites = [for (e in tmp) e.s];
+		if(!refresh) return;
+
+		updateSpriteListRadio();
+		if(sel != null)
+		{
+			var idx:Int = stageSprites.indexOf(sel);
+			if(idx >= 0) spriteListRadioGroup.checked = spriteListRadioGroup.labels.length - idx - 1;
+		}
+	}
+
+	/** Sau Move Up/Down/New/Duplicate: ép layer khớp với hàng xóm để thứ tự và layer không mâu thuẫn. */
+	function fixLayerAfterMove(spr:StageEditorMetaSprite)
+	{
+		var i:Int = stageSprites.indexOf(spr);
+		if(i < 0) return;
+		var prev = (i > 0) ? stageSprites[i - 1] : null;
+		var next = (i < stageSprites.length - 1) ? stageSprites[i + 1] : null;
+		if(prev != null && spr.layer < prev.layer) spr.layer = prev.layer;
+		if(next != null && spr.layer > next.layer) spr.layer = next.layer;
+		if(layerStepper != null) layerStepper.value = spr.layer;
 	}
 
 	var spriteListRadioGroup:PsychUIRadioGroup;
@@ -340,6 +385,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			var newSel:Int = Std.int(Math.min(stageSprites.length-1, selected + 1));
 			stageSprites.remove(spr);
 			stageSprites.insert(newSel, spr);
+			fixLayerAfterMove(spr);
 
 			updateSpriteListRadio();
 		});
@@ -358,6 +404,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			var newSel:Int = Std.int(Math.max(0, selected - 1));
 			stageSprites.remove(spr);
 			stageSprites.insert(newSel, spr);
+			fixLayerAfterMove(spr);
 
 			updateSpriteListRadio();
 		});
@@ -470,6 +517,35 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		buttonDelete.normalStyle.bgColor = FlxColor.RED;
 		buttonDelete.normalStyle.textColor = FlxColor.WHITE;
 		tab_group.add(buttonDelete);
+
+		// Layer (lưu vào JSON "layer", Lua: setObjectLayer/getObjectLayer). Số lớn = vẽ phía trước.
+		var layerLabel:FlxText = new FlxText(buttonX, buttonY + 148, 100, 'Layer:');
+		layerLabel.cameras = [camHUD];
+		tab_group.add(layerLabel);
+		layerStepper = new PsychUINumericStepper(buttonX, buttonY + 166, 1, 0, -999, 999, 0, 60);
+		layerStepper.cameras = [camHUD];
+		layerStepper.onValueChange = function()
+		{
+			var selected = getSelected(false);
+			if(selected == null) return;
+			selected.layer = Std.int(layerStepper.value);
+			sortByLayer(selected);
+			unsavedProgress = true;
+		};
+		tab_group.add(layerStepper);
+
+		// Editor Opacity: CHỈ để xem trong editor (không lưu JSON, không ảnh hưởng Lua/game)
+		var edAlphaLabel:FlxText = new FlxText(buttonX, buttonY + 196, 150, 'Editor Opacity (view only):');
+		edAlphaLabel.cameras = [camHUD];
+		tab_group.add(edAlphaLabel);
+		editorAlphaStepper = new PsychUINumericStepper(buttonX, buttonY + 214, 0.1, 1, 0, 1, 2, true);
+		editorAlphaStepper.cameras = [camHUD];
+		editorAlphaStepper.onValueChange = function()
+		{
+			var selected = getSelected(false);
+			if(selected != null) selected.editorAlpha = editorAlphaStepper.value;
+		};
+		tab_group.add(editorAlphaStepper);
 	}
 
 	function showOutput(txt:String, isError:Bool = false)
@@ -515,6 +591,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 	{
 		var num:Int = Std.int(Math.max(0, Math.min(spriteListRadioGroup.labels.length, spriteListRadioGroup.labels.length - spriteListRadioGroup.checked - 1 + insertOffset)));
 		stageSprites.insert(num, meta);
+		fixLayerAfterMove(meta);
 		updateSpriteListRadio();
 		createPopup.visible = createPopup.active = false;
 		spriteListRadioGroup.checked = spriteListRadioGroup.labels.length - num - 1;
@@ -1138,6 +1215,8 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			updateStageDataUI();
 			reloadCharacters();
 			reloadStageDropDown();
+			// load lua từ Step đã nhập (1 lần duy nhất, ở cuối)
+			reloadLuaIfEnabled();
 		});
 
 		var dummyStage:PsychUIButton = new PsychUIButton(140, 40, 'Load Template', function()
@@ -1173,6 +1252,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 				updateStageDataUI();
 				reloadCharacters();
 				reloadStageDropDown();
+				reloadLuaIfEnabled();
 			}
 			else
 			{
@@ -1198,13 +1278,9 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		};
 		tab_group.add(loadLuaCheckbox);
 
+		// Nhập Step rồi nhấn Reload để load lua từ step đó (không tự reload khi gõ)
 		tab_group.add(new FlxText(180, 95, 50, 'Step:'));
 		luaStepStepper = new PsychUINumericStepper(220, 95, 1, 0, 0, 4096, 0, 60);
-		luaStepStepper.onValueChange = function()
-		{
-			if(loadLuaCheckbox != null && loadLuaCheckbox.checked)
-				reloadStageLua();
-		};
 		tab_group.add(luaStepStepper);
 		#end
 	}
@@ -1257,6 +1333,9 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		posTxt.visible = false;
 		var selected = getSelected(false);
 		if(selected == null) return;
+
+		if(layerStepper != null) layerStepper.value = selected.layer;
+		if(editorAlphaStepper != null) editorAlphaStepper.value = selected.editorAlpha;
 
 		var displayX:Float = Math.round(selected.x);
 		var displayY:Float = Math.round(selected.y);
@@ -1330,44 +1409,55 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		oppDropdown.selectedLabel = dad.curCharacter;
 		gfDropdown.selectedLabel = gf.curCharacter;
 		plDropdown.selectedLabel = boyfriend.curCharacter;
-
-		#if LUA_ALLOWED
-		if(loadLuaCheckbox != null && loadLuaCheckbox.checked)
-			reloadStageLua();
-		#end
 	}
 
 	#if LUA_ALLOWED
 	function unloadStageLua()
 	{
+		if(stageLua != null) stageLua.call('onDestroy', []);
+
+		var allTags:Array<String> = luaSpriteTags.copy();
 		if(stageLua != null)
-		{
-			stageLua.call('onDestroy', []);
-			var allTags:Array<String> = luaSpriteTags.copy();
 			for(tag in stageLua.stagePreviewTags)
 				if(!allTags.contains(tag)) allTags.push(tag);
-			for(tag in allTags)
+		for(tag in allTags) variables.remove(tag);
+
+		// xoá TẤT CẢ lua sprite khỏi danh sách (không chỉ cái đầu tiên của mỗi tag)
+		var removed:Bool = false;
+		var i:Int = stageSprites.length;
+		while(--i >= 0)
+		{
+			var m:StageEditorMetaSprite = stageSprites[i];
+			if(m != null && m.type == 'lua')
 			{
-				variables.remove(tag);
-				// xoá sprite khỏi stageSprites nếu nó là lua sprite
-				for(i in 0...stageSprites.length)
-					if(stageSprites[i] != null && stageSprites[i].type == 'lua' && stageSprites[i].name == tag)
-					{
-						if(stageSprites[i].sprite != null)
-						{
-							remove(stageSprites[i].sprite, true);
-							stageSprites[i].sprite.destroy();
-						}
-						stageSprites.splice(i, 1);
-						break;
-					}
+				stageSprites.splice(i, 1);
+				removed = true;
+				if(m.sprite != null)
+				{
+					FlxTween.cancelTweensOf(m.sprite);
+					remove(m.sprite, true);
+					m.sprite.destroy();
+				}
 			}
-			luaSpriteTags = [];
+		}
+		luaSpriteTags = [];
+
+		if(stageLua != null)
+		{
 			stageLua.stop();
 			luaArray.remove(stageLua);
 			stageLua = null;
-			updateSpriteListRadio();
 		}
+		if(removed && spriteListRadioGroup != null) updateSpriteListRadio();
+	}
+
+	/** Đọc thẳng từ text (value chỉ cập nhật khi input mất focus). */
+	function getLuaStartStep():Int
+	{
+		if(luaStepStepper == null) return 0;
+		var v:Float = Std.parseFloat(luaStepStepper.text);
+		if(Math.isNaN(v)) v = luaStepStepper.value;
+		return Std.int(Math.max(0, Math.min(4096, v)));
 	}
 
 	function reloadStageLua()
@@ -1390,7 +1480,8 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		stageLua.call('onCreatePost', []);
 
 		// simulate steps nếu có stepper
-		var targetStep:Int = luaStepStepper != null ? Std.int(luaStepStepper.value) : 0;
+		var targetStep:Int = getLuaStartStep();
+		if(luaStepStepper != null) luaStepStepper.value = targetStep;
 		if(targetStep > 0)
 		{
 			stageLua.stagePreviewSimulatingSteps = true;
@@ -1421,16 +1512,81 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 				break;
 			}
 		if(tag == null) tag = 'luaSprite_' + luaSpriteTags.length;
-
 		if(!luaSpriteTags.contains(tag)) luaSpriteTags.push(tag);
 
-		// thêm vào state để render
-		if(inFront) add(sprite); else insert(members.indexOf(dad), sprite);
+		// cùng sprite gọi addLuaSprite nhiều lần → dùng lại meta cũ, KHÔNG tạo bản sao
+		var meta:StageEditorMetaSprite = null;
+		for(m in stageSprites)
+			if(m != null && m.type == 'lua' && m.sprite == sprite)
+			{
+				meta = m;
+				break;
+			}
 
-		// thêm vào sprite list
-		var meta = new StageEditorMetaSprite({type: 'lua', name: tag}, sprite);
-		stageSprites.push(meta);
+		// makeLuaSprite chạy lại cùng tag (sprite cũ đã bị destroy) hoặc sprite chết → bỏ meta cũ
+		var i:Int = stageSprites.length;
+		while(--i >= 0)
+		{
+			var m:StageEditorMetaSprite = stageSprites[i];
+			if(m != null && m.type == 'lua' && m != meta && (m.name == tag || m.sprite == null || !m.sprite.exists))
+				stageSprites.splice(i, 1);
+		}
+
+		if(meta == null) meta = new StageEditorMetaSprite({type: 'lua', name: tag}, sprite);
+		else stageSprites.remove(meta);
+
+		// giống PlayState: inFront → trên cùng, không thì chèn trước character thấp nhất
+		var pos:Int = stageSprites.length;
+		if(!inFront)
+			for(j in 0...stageSprites.length)
+				if(stageSprites[j] != null && StageData.reservedNames.contains(stageSprites[j].type))
+				{
+					pos = j;
+					break;
+				}
+		stageSprites.insert(pos, meta);
+		fixLayerAfterMove(meta);
 		updateSpriteListRadio();
+	}
+
+	public function removeStagePreviewLuaSprite(sprite:FlxSprite):Void
+	{
+		var i:Int = stageSprites.length;
+		while(--i >= 0)
+		{
+			var m:StageEditorMetaSprite = stageSprites[i];
+			if(m != null && m.type == 'lua' && m.sprite == sprite) stageSprites.splice(i, 1);
+		}
+		updateSpriteListRadio();
+	}
+
+	function findMetaByName(name:String):StageEditorMetaSprite
+	{
+		var t:String = switch(name.toLowerCase())
+		{
+			case 'boyfriend' | 'bf' | 'boyfriendgroup': 'boyfriend';
+			case 'dad' | 'opponent' | 'dadgroup': 'dad';
+			case 'gf' | 'girlfriend' | 'gfgroup': 'gf';
+			default: null;
+		};
+		for(m in stageSprites)
+			if(m != null && (t != null ? m.type == t : m.name == name)) return m;
+		return null;
+	}
+
+	/** Lua: setObjectLayer(obj, layer) khi chạy trong stage editor. */
+	public function setStagePreviewLayer(name:String, layer:Int):Void
+	{
+		var m:StageEditorMetaSprite = findMetaByName(name);
+		if(m == null) return;
+		m.layer = layer;
+		sortByLayer(m);
+	}
+
+	public function getStagePreviewLayer(name:String):Int
+	{
+		var m:StageEditorMetaSprite = findMetaByName(name);
+		return m != null ? m.layer : 0;
 	}
 	#end
 	
@@ -1501,7 +1657,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			createPopup.visible = createPopup.active = false;
 
 		for (basic in stageSprites)
-			basic.update(curFilters, elapsed);
+			if(basic != null) basic.update(curFilters, elapsed);
 
 		super.update(elapsed);
 		
@@ -1688,7 +1844,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		{
 
 			for (basic in stageSprites)
-				if(basic.visible)
+				if(basic != null && basic.sprite != null && basic.visible)
 					basic.draw(curFilters);
 	
 			if(showSelectionQuad && spriteListRadioGroup.checkedRadio != null)
@@ -2116,6 +2272,11 @@ class StageEditorMetaSprite
 	// basic variables for all types
 	public var type:String;
 
+	/** Layer (lưu vào JSON). Lớn hơn = vẽ phía trước. */
+	public var layer:Int = 0;
+	/** Chỉ dùng để xem trong editor, KHÔNG lưu JSON và không đụng vào alpha thật. */
+	public var editorAlpha:Float = 1;
+
 	// variables for all types that aren't Character
 	public var name:String;
 	public var filters:LoadFilters = (LOW_QUALITY)|(HIGH_QUALITY);
@@ -2197,6 +2358,8 @@ class StageEditorMetaSprite
 		if(data == null) return;
 
 		this.type = data.type;
+		var lyr:Dynamic = Reflect.field(data, 'layer');
+		if(lyr != null) this.layer = Std.int(lyr);
 		switch(this.type)
 		{
 			case 'sprite', 'square', 'animatedSprite':
@@ -2256,19 +2419,32 @@ class StageEditorMetaSprite
 				obj.filters = filters;
 				obj.image = image;
 		}
+		if(layer != 0) obj.layer = layer;
 		return obj;
 	}
 
 	public function update(curFilters:LoadFilters, elapsed:Float)
 	{
+		if(sprite == null || !sprite.exists) return;
 		if((curFilters & filters) != 0 || StageData.reservedNames.contains(type) || type == 'lua')
 			sprite.update(elapsed);
 	}
 
 	public function draw(curFilters:LoadFilters)
 	{
+		if(sprite == null || !sprite.exists) return;
 		if((curFilters & filters) != 0 || StageData.reservedNames.contains(type) || type == 'lua')
-			sprite.draw();
+		{
+			if(editorAlpha < 1)
+			{
+				// alpha chỉ đổi lúc vẽ rồi trả lại → không lọt vào JSON/Lua
+				var oldAlpha:Float = sprite.alpha;
+				sprite.alpha = oldAlpha * editorAlpha;
+				sprite.draw();
+				sprite.alpha = oldAlpha;
+			}
+			else sprite.draw();
+		}
 	}
 }
 

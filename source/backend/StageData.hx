@@ -118,8 +118,12 @@ class StageData {
 	public static function addObjectsToState(objectList:Array<Dynamic>, gf:FlxSprite, dad:FlxSprite, boyfriend:FlxSprite, ?group:Dynamic = null, ?ignoreFilters:Bool = false)
 	{
 		var addedObjects:Map<String, FlxSprite> = [];
-		for (num => data in objectList)
+		StageLayers.clear();
+		// sort ổn định theo "layer" (mặc định 0 → giữ nguyên thứ tự JSON); num vẫn là index gốc trong JSON
+		var order:Array<Int> = StageLayers.sortedOrder(objectList);
+		for (num in order)
 		{
+			var data:Dynamic = objectList[num];
 			if (addedObjects.exists(data)) continue;
 
 			switch(data.type)
@@ -130,6 +134,7 @@ class StageData {
 						gf.ID = num; 
 						if (group != null) group.add(gf);
 						addedObjects.set('gf', gf);
+						StageLayers.register(gf, data);
 					}
 				case 'dad', 'dadGroup':
 					if(dad != null)
@@ -137,6 +142,7 @@ class StageData {
 						dad.ID = num;
 						if (group != null) group.add(dad);
 						addedObjects.set('dad', dad);
+						StageLayers.register(dad, data);
 					}
 				case 'boyfriend', 'boyfriendGroup':
 					if(boyfriend != null)
@@ -144,6 +150,7 @@ class StageData {
 						boyfriend.ID = num;
 						if (group != null) group.add(boyfriend);
 						addedObjects.set('boyfriend', boyfriend);
+						StageLayers.register(boyfriend, data);
 					}
 
 				case 'square', 'sprite', 'animatedSprite':
@@ -204,6 +211,7 @@ class StageData {
 
 					if (group != null) group.add(spr);
 					addedObjects.set(data.name, spr);
+					StageLayers.register(spr, data);
 
 				default:
 					var err = '[Stage .JSON file] Unknown sprite type detected: ${data.type}';
