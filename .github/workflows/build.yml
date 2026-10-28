@@ -55,10 +55,18 @@ jobs:
       # Cache dependencies between source-only builds. The exact key changes when
       # dependency pins, project libraries, or this install workflow changes.
       # No restore-keys: never reuse a cache built from different dependency definitions.
-      - name: Cache haxelib
+      - name: Cache haxelib (Unix)
+        if: runner.os != 'Windows'
         uses: actions/cache@v5
         with:
           path: ~/haxelib
+          key: haxelib-${{ runner.os }}-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/unix.sh', 'setup/windows.bat', 'Project.xml', '.github/workflows/build.yml') }}
+
+      - name: Cache haxelib (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v5
+        with:
+          path: ~/AppData/Roaming/Haxe/haxelib
           key: haxelib-${{ runner.os }}-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/unix.sh', 'setup/windows.bat', 'Project.xml', '.github/workflows/build.yml') }}
 
       - name: Install Libraries
@@ -67,7 +75,8 @@ jobs:
       - name: Install hxdr_libs (mp3 support)
         shell: bash
         run: |
-          if [ ! -d "$HOME/haxelib/hxdr_libs/git" ]; then
+          HAXELIB_PATH="$(haxelib config)"
+          if [ ! -d "$HAXELIB_PATH/hxdr_libs/git" ]; then
             haxelib git hxdr_libs https://github.com/MAJigsaw77/hxdr_libs.git
           fi
           # thêm vào Project.xml nếu chưa có (để define hxdr_libs được bật)
