@@ -60,14 +60,14 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/haxelib
-          key: haxelib-${{ runner.os }}-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/unix.sh', 'setup/windows.bat', 'Project.xml', '.github/workflows/build.yml') }}
+          key: haxelib-${{ runner.os }}-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/unix.sh', 'Project.xml') }}
 
       - name: Cache haxelib (Windows)
         if: runner.os == 'Windows'
         uses: actions/cache@v5
         with:
           path: ~/AppData/Roaming/Haxe/haxelib
-          key: haxelib-${{ runner.os }}-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/unix.sh', 'setup/windows.bat', 'Project.xml', '.github/workflows/build.yml') }}
+          key: haxelib-${{ runner.os }}-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/windows.bat', 'Project.xml') }}
 
       - name: Install Libraries
         run: ${{ inputs.setupCommand }}
@@ -91,16 +91,24 @@ jobs:
           haxelib run lime config JAVA_HOME $JAVA_HOME_17_arm64
           haxelib run lime config ANDROID_SETUP true
 
-      - name: Cache hxcpp build objects
+      # Use hxcpp's content-addressed cache instead of caching generated obj folders.
+      # It hashes source/dependency contents and compiler flags, so regenerated C++ files
+      # can still reuse previously compiled objects across clean GitHub runners.
+      - name: Configure hxcpp compile cache
+        if: inputs.name == 'Android'
+        shell: bash
+        run: |
+          echo "HXCPP_COMPILE_CACHE=$RUNNER_TEMP/hxcpp-cache" >> "$GITHUB_ENV"
+          echo "HXCPP_CACHE_MB=2000" >> "$GITHUB_ENV"
+
+      - name: Cache hxcpp compile cache
         if: inputs.name == 'Android'
         uses: actions/cache@v5
         with:
-          path: |
-            export/debug/android/obj
-            export/release/android/obj
-          key: hxcpp-${{ runner.os }}-android-${{ hashFiles('setup/unix.sh') }}
+          path: ${{ runner.temp }}/hxcpp-cache
+          key: hxcpp-compile-${{ runner.os }}-android-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/unix.sh') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            hxcpp-${{ runner.os }}-android-
+            hxcpp-compile-${{ runner.os }}-android-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/unix.sh') }}-
 
       - name: Cache Gradle
         if: inputs.name == 'Android'
