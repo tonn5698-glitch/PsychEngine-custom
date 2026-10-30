@@ -61,10 +61,8 @@ class VideoManager
 		video.videoSprite.cameras = [camera];
 
 		if (!loop)
-		{
 			video.finishCallback = function() videos.remove(name);
-			video.onSkip = function() videos.remove(name);
-		}
+		video.onSkip = function() videos.remove(name);
 
 		videos.set(name, video);
 		if (layer >= 0 && layer <= state.members.length)
@@ -76,12 +74,68 @@ class VideoManager
 		return video;
 	}
 
+	public function get(name:String):VideoSprite
+	{
+		return videos.get(name);
+	}
+
 	public function stop(name:String):Void
 	{
 		var video:VideoSprite = videos.get(name);
 		if (video == null) return;
 		video.destroy();
 		videos.remove(name);
+	}
+
+	public function pause(name:String):Void
+	{
+		var video:VideoSprite = videos.get(name);
+		if (video != null) video.pause();
+	}
+
+	public function skip(name:String):Void
+	{
+		var video:VideoSprite = videos.get(name);
+		if (video != null) video.skip();
+	}
+
+	public function resume(name:String):Void
+	{
+		var video:VideoSprite = videos.get(name);
+		if (video != null) video.resume();
+	}
+
+	public function setCamera(name:String, cameraName:String):Bool
+	{
+		var video:VideoSprite = videos.get(name);
+		if (video == null) return false;
+		var camera:FlxCamera = getCamera(cameraName);
+		video.cameras = [camera];
+		video.videoSprite.cameras = [camera];
+		return true;
+	}
+
+	public function setProperty(name:String, property:String, value:Dynamic):Bool
+	{
+		var video:VideoSprite = videos.get(name);
+		if (video == null || property == null) return false;
+
+		switch (property.toLowerCase())
+		{
+			case 'x': video.x = value;
+			case 'y': video.y = value;
+			case 'alpha': video.alpha = value;
+			case 'visible': video.visible = value;
+			case 'active': video.active = value;
+			case 'canskip': video.canSkip = value;
+			case 'angle': video.angle = value;
+			case 'scalex': video.scale.x = value;
+			case 'scaley': video.scale.y = value;
+			case 'scrollfactorx': video.scrollFactor.x = value;
+			case 'scrollfactory': video.scrollFactor.y = value;
+			default: return false;
+		}
+		return true;
 	}
 
 	public function pauseAll():Void
@@ -112,11 +166,11 @@ class VideoManager
 		if (name == null) name = 'custom';
 		switch (name.toLowerCase().trim())
 		{
-			case 'game' | 'stage':
+			case 'game' | 'stage' | 'camgame':
 				if (PlayState.instance != null && PlayState.instance.camGame != null) return PlayState.instance.camGame;
-			case 'hud':
+			case 'hud' | 'camhud':
 				if (PlayState.instance != null && PlayState.instance.camHUD != null) return PlayState.instance.camHUD;
-			case 'other':
+			case 'other' | 'camother':
 				if (PlayState.instance != null && PlayState.instance.camOther != null) return PlayState.instance.camOther;
 		}
 		return customCamera;

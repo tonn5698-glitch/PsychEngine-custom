@@ -2348,44 +2348,6 @@ class PlayState extends MusicBeatState
 	}
 
 	public function triggerEvent(eventName:String, value1:String, value2:String, strumTime:Float) {
-		#if VIDEOS_ALLOWED
-		if (eventName == 'VideoSprite')
-		{
-			var videoName:String = value1 != null ? value1.trim() : '';
-			var cameraName:String = 'custom';
-			var layer:Int = -1;
-			var loop:Bool = false;
-			var canSkip:Bool = false;
-
-			if (value2 != null && value2.trim().length > 0)
-			{
-				for (part in value2.split(';'))
-				{
-					var pair:Array<String> = part.split('=');
-					if (pair.length < 2) continue;
-					var key:String = pair[0].trim().toLowerCase();
-					var val:String = pair.slice(1).join('=').trim();
-					switch (key)
-					{
-						case 'camera': cameraName = val;
-						case 'layer':
-							var parsedLayer:Null<Int> = Std.parseInt(val);
-							layer = parsedLayer == null ? -1 : parsedLayer;
-						case 'loop': loop = (val.toLowerCase() == 'true' || val == '1');
-						case 'skip': canSkip = (val.toLowerCase() == 'true' || val == '1');
-					}
-				}
-			}
-
-			if (videoManager != null && videoName.length > 0)
-			{
-				var video:VideoSprite = videoManager.play(videoName, cameraName, layer, loop, canSkip);
-				if (video == null)
-					FlxG.log.warn('Video not found: ' + videoName);
-			}
-			return;
-		}
-		#end
 		var flValue1:Null<Float> = Std.parseFloat(value1);
 		var flValue2:Null<Float> = Std.parseFloat(value2);
 		if(Math.isNaN(flValue1)) flValue1 = null;

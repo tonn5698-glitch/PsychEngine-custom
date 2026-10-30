@@ -23,6 +23,7 @@ import objects.Note;
 import objects.NoteSplash;
 import objects.Character;
 #if VIDEOS_ALLOWED
+import objects.VideoSprite;
 import hxvlc.flixel.FlxVideoSprite;
 #end
 
@@ -333,6 +334,38 @@ class FunkinLua {
 		Lua_helper.add_callback(lua, "getVar", function(varName:String) {
 			return MusicBeatState.getVariables().get(varName);
 		});
+
+		#if VIDEOS_ALLOWED
+		Lua_helper.add_callback(lua, "playVideo", function(name:String, ?camera:String = 'custom', ?layer:Int = -1, ?loop:Bool = false, ?canSkip:Bool = false, ?x:Float = 0, ?y:Float = 0) {
+			if (game == null || game.videoManager == null) return false;
+			var video:VideoSprite = game.videoManager.play(name, camera, layer, loop, canSkip);
+			if (video == null) return false;
+			video.x = x;
+			video.y = y;
+			return true;
+		});
+		Lua_helper.add_callback(lua, "stopVideo", function(name:String) {
+			if (game != null && game.videoManager != null) game.videoManager.stop(name);
+		});
+		Lua_helper.add_callback(lua, "pauseVideo", function(name:String) {
+			if (game != null && game.videoManager != null) game.videoManager.pause(name);
+		});
+		Lua_helper.add_callback(lua, "skipVideo", function(name:String) {
+			if (game != null && game.videoManager != null) game.videoManager.skip(name);
+		});
+		Lua_helper.add_callback(lua, "resumeVideo", function(name:String) {
+			if (game != null && game.videoManager != null) game.videoManager.resume(name);
+		});
+		Lua_helper.add_callback(lua, "setVideoProperty", function(name:String, property:String, value:Dynamic) {
+			return game != null && game.videoManager != null && game.videoManager.setProperty(name, property, value);
+		});
+		Lua_helper.add_callback(lua, "setVideoCamera", function(name:String, camera:String) {
+			return game != null && game.videoManager != null && game.videoManager.setCamera(name, camera);
+		});
+		Lua_helper.add_callback(lua, "getVideo", function(name:String) {
+			return game != null && game.videoManager != null ? game.videoManager.get(name) : null;
+		});
+		#end
 
 		Lua_helper.add_callback(lua, "addLuaScript", function(luaFile:String, ?ignoreAlreadyRunning:Bool = false) {
 			var luaPath:String = findScript(luaFile);
@@ -1059,10 +1092,9 @@ class FunkinLua {
 			leSprite.active = true;
 		});
 		#if VIDEOS_ALLOWED
-		// Mid-song video sprite for mods (e.g. the binary-rain layer in
-		// Vs. Dave & Bambi's "matrix" stage). objects.VideoSprite is built for
-		// cutscenes (skip pie + black cover), so this exposes the bare
-		// hxvlc sprite instead and lets Lua place/scale/tint it like any sprite.
+		// Legacy raw hxvlc video-sprite API for existing mods that need direct
+		// FlxVideoSprite access. New managed videos should use playVideo() and
+		// the shared VideoManager API above.
 		Lua_helper.add_callback(lua, "makeLuaVideoSprite", function(tag:String, video:String, ?x:Float = 0, ?y:Float = 0, ?shouldLoop:Bool = true, ?stretch:Bool = true) {
 			tag = tag.replace('.', '');
 			LuaUtils.destroyObject(tag);

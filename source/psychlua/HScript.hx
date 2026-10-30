@@ -160,6 +160,38 @@ class HScript extends Iris
 		set('FlxColor', CustomFlxColor);
 		set('Countdown', backend.BaseStage.Countdown);
 		set('PlayState', PlayState);
+		#if VIDEOS_ALLOWED
+		set('playVideo', function(name:String, ?camera:String = 'custom', ?layer:Int = -1, ?loop:Bool = false, ?canSkip:Bool = false, ?x:Float = 0, ?y:Float = 0) {
+			var game:PlayState = PlayState.instance;
+			if (game == null || game.videoManager == null) return false;
+			var video = game.videoManager.play(name, camera, layer, loop, canSkip);
+			if (video == null) return false;
+			video.x = x;
+			video.y = y;
+			return true;
+		});
+		set('stopVideo', function(name:String) {
+			if (PlayState.instance != null && PlayState.instance.videoManager != null) PlayState.instance.videoManager.stop(name);
+		});
+		set('pauseVideo', function(name:String) {
+			if (PlayState.instance != null && PlayState.instance.videoManager != null) PlayState.instance.videoManager.pause(name);
+		});
+		set('skipVideo', function(name:String) {
+			if (PlayState.instance != null && PlayState.instance.videoManager != null) PlayState.instance.videoManager.skip(name);
+		});
+		set('resumeVideo', function(name:String) {
+			if (PlayState.instance != null && PlayState.instance.videoManager != null) PlayState.instance.videoManager.resume(name);
+		});
+		set('getVideo', function(name:String) {
+			return PlayState.instance != null && PlayState.instance.videoManager != null ? PlayState.instance.videoManager.get(name) : null;
+		});
+		set('setVideoCamera', function(name:String, camera:String) {
+			return PlayState.instance != null && PlayState.instance.videoManager != null && PlayState.instance.videoManager.setCamera(name, camera);
+		});
+		set('setVideoProperty', function(name:String, property:String, value:Dynamic) {
+			return PlayState.instance != null && PlayState.instance.videoManager != null && PlayState.instance.videoManager.setProperty(name, property, value);
+		});
+		#end
 		set('Paths', Paths);
 		set('StorageUtil', StorageUtil);
 		set('Conductor', Conductor);

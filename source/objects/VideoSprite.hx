@@ -122,6 +122,14 @@ class VideoSprite extends FlxSpriteGroup {
 		}
 	}
 
+	public function skip():Void
+	{
+		if (alreadyDestroyed) return;
+		if (onSkip != null) onSkip();
+		finishCallback = null;
+		finishVideo();
+	}
+
 	override function update(elapsed:Float)
 	{
 		if(canSkip)
@@ -138,9 +146,7 @@ class VideoSprite extends FlxSpriteGroup {
 
 			if(holdingTime >= _timeToSkip)
 			{
-				if(onSkip != null) onSkip();
-				finishCallback = null;
-				videoSprite.bitmap.onEndReached.dispatch();
+				skip();
 				trace('Skipped video');
 				return;
 			}

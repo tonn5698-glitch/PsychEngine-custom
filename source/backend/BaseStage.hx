@@ -7,6 +7,9 @@ import flixel.group.FlxGroup;
 
 import objects.Note;
 import objects.Character;
+#if VIDEOS_ALLOWED
+import objects.VideoSprite;
+#end
 
 enum Countdown
 {
@@ -114,6 +117,32 @@ class BaseStage extends FlxBasic
 
 	public function getStageObject(name:String) //Objects can only be accessed *after* create(), use createPost() if you want to mess with them on init
 		return game.variables.get(name);
+
+	#if VIDEOS_ALLOWED
+	public function playVideo(name:String, camera:String = 'custom', layer:Int = -1, loop:Bool = false, canSkip:Bool = false):VideoSprite
+		return game != null && game.videoManager != null ? game.videoManager.play(name, camera, layer, loop, canSkip) : null;
+
+	public function getVideo(name:String):VideoSprite
+		return game != null && game.videoManager != null ? game.videoManager.get(name) : null;
+
+	public function stopVideo(name:String):Void
+		if (game != null && game.videoManager != null) game.videoManager.stop(name);
+
+	public function pauseVideo(name:String):Void
+		if (game != null && game.videoManager != null) game.videoManager.pause(name);
+
+	public function skipVideo(name:String):Void
+		if (game != null && game.videoManager != null) game.videoManager.skip(name);
+
+	public function resumeVideo(name:String):Void
+		if (game != null && game.videoManager != null) game.videoManager.resume(name);
+
+	public function setVideoCamera(name:String, camera:String):Bool
+		return game != null && game.videoManager != null && game.videoManager.setCamera(name, camera);
+
+	public function setVideoProperty(name:String, property:String, value:Dynamic):Bool
+		return game != null && game.videoManager != null && game.videoManager.setProperty(name, property, value);
+	#end
 
 	//start/end callback functions
 	public function setStartCallback(myfn:Void->Void)
