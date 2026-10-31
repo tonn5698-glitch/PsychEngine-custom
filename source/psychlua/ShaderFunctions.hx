@@ -10,6 +10,9 @@ class ShaderFunctions
 	public static function implement(funk:FunkinLua)
 	{
 		var lua = funk.lua;
+		// Keep references to camera shaders so Lua can update their uniforms later.
+		// Each Lua script has its own state, but camera filters are shared by the engine.
+		var cameraShaderObjects:Map<String, Map<String, Dynamic>> = new Map();
 		// shader shit
 		funk.addLocalCallback("initLuaShader", function(name:String) {
 			if(!ClientPrefs.data.shaders) return false;
@@ -93,6 +96,9 @@ class ShaderFunctions
 
 			var arr:Array<String> = funk.runtimeShaders.get(shader);
 			var shaderObj = new shaders.ErrorHandledShader.ErrorHandledRuntimeShader(shader, arr[0], arr[1]);
+			var cameraKey = camera.toLowerCase();
+			if(!cameraShaderObjects.exists(cameraKey)) cameraShaderObjects.set(cameraKey, new Map());
+			cameraShaderObjects.get(cameraKey).set(shader, shaderObj);
 			var filter = new ShaderFilter(shaderObj);
 
 			// Store shader name on camera for later reference
@@ -104,6 +110,30 @@ class ShaderFunctions
 			FunkinLua.luaTrace("setCameraShader: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
 			#end
 			return false;
+		});
+
+		Lua_helper.add_callback(lua, "setCameraShaderFloat", function(camera:String, shader:String, prop:String, value:Float) {
+			var shaderMap = cameraShaderObjects.get(camera.toLowerCase());
+			var shaderObj:Dynamic = shaderMap != null ? shaderMap.get(shader) : null;
+			if(shaderObj == null)
+			{
+				FunkinLua.luaTrace('setCameraShaderFloat: Camera shader "$shader" on "$camera" was not created!', false, false, FlxColor.RED);
+				return false;
+			}
+			shaderObj.setFloat(prop, value);
+			return true;
+		});
+
+		Lua_helper.add_callback(lua, "setCameraShaderInt", function(camera:String, shader:String, prop:String, value:Int) {
+			var shaderMap = cameraShaderObjects.get(camera.toLowerCase());
+			var shaderObj:Dynamic = shaderMap != null ? shaderMap.get(shader) : null;
+			if(shaderObj == null)
+			{
+				FunkinLua.luaTrace('setCameraShaderInt: Camera shader "$shader" on "$camera" was not created!', false, false, FlxColor.RED);
+				return false;
+			}
+			shaderObj.setInt(prop, value);
+			return true;
 		});
 
 		Lua_helper.add_callback(lua, "removeCameraShader", function(camera:String) {

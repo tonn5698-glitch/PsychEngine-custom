@@ -365,6 +365,20 @@ class FunkinLua {
 		Lua_helper.add_callback(lua, "getVideo", function(name:String) {
 			return game != null && game.videoManager != null ? game.videoManager.get(name) : null;
 		});
+		Lua_helper.add_callback(lua, "getVideoLength", function(name:String) {
+			if(game == null || game.videoManager == null) return -1.0;
+			var video:VideoSprite = game.videoManager.get(name);
+			if(video == null || video.videoSprite == null || video.videoSprite.bitmap == null) return -1.0;
+			return video.videoSprite.bitmap.length;
+		});
+		Lua_helper.add_callback(lua, "skipVideoAndSeek", function(name:String, target:Float) {
+			if(game == null || game.videoManager == null || game.videoManager.get(name) == null) return false;
+			game.clearNotesBefore(target);
+			game.setSongTime(target);
+			game.checkEventNote();
+			game.videoManager.skip(name);
+			return true;
+		});
 		#end
 
 		Lua_helper.add_callback(lua, "addLuaScript", function(luaFile:String, ?ignoreAlreadyRunning:Bool = false) {

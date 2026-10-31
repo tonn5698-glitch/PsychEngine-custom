@@ -22,6 +22,13 @@ pauseVideo('intro')
 resumeVideo('intro')
 skipVideo('intro') -- invokes the video's skip callback, then destroys it
 stopVideo('intro') -- immediate stop
+
+-- Get the loaded video's duration (milliseconds), or -1 if unavailable.
+local duration = getVideoLength('intro')
+
+-- Seek the song to a video-relative timestamp, dispatch skipped chart events,
+-- then remove the video. target is in milliseconds.
+skipVideoAndSeek('intro', duration)
 ```
 
 Function signature:

@@ -27,3 +27,12 @@ art/build_html.bat
 art/build_html-debug.bat
 ### CI watcher logs
 logs/
+
+### Locally generated archives (kept outside Git)
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+!/.github/workflows.zip
+!/example_mods/modTemplate.zip
