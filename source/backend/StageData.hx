@@ -153,6 +153,27 @@ class StageData {
 						StageLayers.register(boyfriend, data);
 					}
 
+				case 'combo':
+					var comboSprite:FlxSprite;
+					if(group == null)
+					{
+						var comboLabel:FlxText = new FlxText(data.x, data.y, 180, 'Combo', 20);
+						comboLabel.setFormat(null, 20, FlxColor.YELLOW, CENTER, OUTLINE_FAST, FlxColor.BLACK);
+						comboLabel.borderSize = 2;
+						comboLabel.scrollFactor.set(1, 1);
+						comboSprite = comboLabel;
+					}
+					else
+					{
+						comboSprite = new FlxSprite(data.x, data.y);
+						comboSprite.makeGraphic(1, 1, FlxColor.TRANSPARENT);
+						comboSprite.visible = false;
+					}
+					comboSprite.ID = num;
+					if(group != null) group.add(comboSprite);
+					addedObjects.set('Combo', comboSprite);
+					StageLayers.register(comboSprite, data);
+
 				case 'square', 'sprite', 'animatedSprite':
 					if(!ignoreFilters && !validateVisibility(data.filters)) continue;
 

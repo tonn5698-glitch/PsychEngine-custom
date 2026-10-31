@@ -52,6 +52,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 	#end
 	var luaStepStepper:PsychUINumericStepper;
 	var loadLuaCheckbox:PsychUICheckBox;
+	var comboOnStageCheckbox:PsychUICheckBox;
 	var layerStepper:PsychUINumericStepper;
 	var editorAlphaStepper:PsychUINumericStepper;
 
@@ -236,6 +237,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 		sortByLayer(null, false);
 		updateSpriteListRadio();
+		if(comboOnStageCheckbox != null) comboOnStageCheckbox.checked = (findComboMeta() != null);
 	}
 
 	/** Load lại lua (nếu checkbox bật) — chỉ gọi 1 lần ở cuối mỗi lần Reload/đổi stage. */
@@ -434,7 +436,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 			var selected:Int = spriteListRadioGroup.labels.length - selected - 1;
 			var spr = stageSprites[selected];
-			if(spr == null || StageData.reservedNames.contains(spr.type)) return;
+			if(spr == null || StageData.reservedNames.contains(spr.type) || spr.type == 'combo') return;
 
 			var copiedSpr = new ModchartSprite();
 			var copiedMeta:StageEditorMetaSprite = new StageEditorMetaSprite(null, copiedSpr);
@@ -522,6 +524,10 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			spr.sprite = FlxDestroyUtil.destroy(spr.sprite);
 
 			updateSpriteListRadio();
+			if(comboOnStageCheckbox != null) comboOnStageCheckbox.checked = (findComboMeta() != null);
+			checkUIOnObject();
+			updateSelectedUI();
+			unsavedProgress = true;
 		});
 		buttonDelete.cameras = [camHUD];
 		buttonDelete.normalStyle.bgColor = FlxColor.RED;
@@ -697,7 +703,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		add(UI_box);
 		UI_box.selectedName = 'Data';
 
-		UI_stagebox = new PsychUIBox(FlxG.width - 275, 25, 250, 120, ['Stage']);
+		UI_stagebox = new PsychUIBox(FlxG.width - 275, 25, 250, 155, ['Stage']);
 		UI_stagebox.cameras = [camHUD];
 		UI_stagebox.scrollFactor.set();
 		add(UI_stagebox);
@@ -910,6 +916,11 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			var selected = getSelected();
 			if(selected != null)
 			{
+				if(selected.type == 'combo')
+				{
+					nameInputText.text = 'Combo';
+					return;
+				}
 				var changedName:String = nameInputText.text;
 				if(changedName.length < 1)
 				{
@@ -1293,8 +1304,53 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		luaStepStepper = new PsychUINumericStepper(220, 95, 1, 0, 0, 4096, 0, 60);
 		tab_group.add(luaStepStepper);
 		#end
+
+		comboOnStageCheckbox = new PsychUICheckBox(10, 125, 'Combo on stage', 150);
+		comboOnStageCheckbox.onClick = function()
+		{
+			setComboOnStage(comboOnStageCheckbox.checked);
+		};
+		tab_group.add(comboOnStageCheckbox);
 	}
-	
+
+	function findComboMeta():StageEditorMetaSprite
+	{
+		for(meta in stageSprites)
+			if(meta != null && meta.type == 'combo') return meta;
+		return null;
+	}
+
+	function setComboOnStage(enabled:Bool):Void
+	{
+		var combo:StageEditorMetaSprite = findComboMeta();
+		if(enabled && combo == null)
+		{
+			var startX:Float = FlxG.width * 0.5;
+			var startY:Float = FlxG.height * 0.5;
+			var label:FlxText = new FlxText(startX, startY, 180, 'Combo', 20);
+			label.setFormat(null, 20, FlxColor.YELLOW, CENTER, OUTLINE_FAST, FlxColor.BLACK);
+			label.borderSize = 2;
+			label.scrollFactor.set(1, 1);
+			combo = new StageEditorMetaSprite({type: 'combo', name: 'Combo', x: startX, y: startY}, label);
+			stageSprites.push(combo);
+			sortByLayer(combo);
+			for(i in 0...spriteListRadioGroup.labels.length)
+				if(spriteListRadioGroup.labels[i] == 'Combo') { spriteListRadioGroup.checked = i; break; }
+			checkUIOnObject();
+			updateSelectedUI();
+			unsavedProgress = true;
+		}
+		else if(!enabled && combo != null)
+		{
+			stageSprites.remove(combo);
+			if(combo.sprite != null) combo.sprite.destroy();
+			updateSpriteListRadio();
+			checkUIOnObject();
+			updateSelectedUI();
+			unsavedProgress = true;
+		}
+	}
+
 	function updateStageDataUI()
 	{
 		//input texts
@@ -1302,6 +1358,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		//checkboxes
 		hideGirlfriendCheckbox.checked = (stageJson.hide_girlfriend);
 		gf.visible = !hideGirlfriendCheckbox.checked;
+		if(comboOnStageCheckbox != null) comboOnStageCheckbox.checked = (findComboMeta() != null);
 		//steppers
 		zoomStepper.value = FlxG.camera.zoom = stageJson.defaultZoom;
 		
@@ -1353,7 +1410,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		var char:Character = cast selected.sprite;
 		if(char != null)
 		{
-			displayX -= char.positionArray[0];
+			displayX -= char.positionArray[0] + CoolUtil.designCutout();
 			displayY -= char.positionArray[1];
 		}
 
@@ -1508,19 +1565,36 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			}
 			stageLua.stagePreviewSimulatingSteps = false;
 		}
+
+		// Lua có thể đổi vị trí sprite sau makeLuaSprite/addLuaSprite; lấy trạng thái
+		// cuối cùng của preview làm mốc để chỉ ghi lại khi người dùng kéo sprite.
+		for(meta in stageSprites)
+		{
+			if(meta != null && meta.type == 'lua')
+			{
+				meta.luaOriginalX = meta.x;
+				meta.luaOriginalY = meta.y;
+			}
+		}
 	}
 
 	public function addStagePreviewLuaSprite(sprite:FlxSprite, inFront:Bool = false):Void
 	{
 		if(sprite == null) return;
-		// tìm tag từ variables
+		// Giữ tag gốc (kể cả dấu chấm); key trong variables đã được engine chuẩn hoá.
 		var tag:String = null;
-		for(key => value in variables)
-			if(value == sprite)
-			{
-				tag = key;
-				break;
-			}
+		if(Std.isOfType(sprite, ModchartSprite))
+		{
+			var luaSprite:ModchartSprite = cast sprite;
+			if(luaSprite.luaTag != null) tag = luaSprite.luaTag;
+		}
+		if(tag == null)
+			for(key => value in variables)
+				if(value == sprite)
+				{
+					tag = key;
+					break;
+				}
 		if(tag == null) tag = 'luaSprite_' + luaSpriteTags.length;
 		if(!luaSpriteTags.contains(tag)) luaSpriteTags.push(tag);
 
@@ -1544,6 +1618,9 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 		if(meta == null) meta = new StageEditorMetaSprite({type: 'lua', name: tag}, sprite);
 		else stageSprites.remove(meta);
+		meta.name = tag;
+		meta.luaOriginalX = sprite.x;
+		meta.luaOriginalY = sprite.y;
 
 		// giống PlayState: inFront → trên cùng, không thì chèn trước character thấp nhất
 		var pos:Int = stageSprites.length;
@@ -1834,14 +1911,22 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 				switch(spr.type)
 				{
 					case 'boyfriend':
-						stageJson.boyfriend[0] = displayX = spr.x - char.positionArray[0];
+						stageJson.boyfriend[0] = displayX = spr.x - char.positionArray[0] - CoolUtil.designCutout();
 						stageJson.boyfriend[1] = displayY = spr.y - char.positionArray[1];
 					case 'gf':
-						stageJson.girlfriend[0] = displayX = spr.x - char.positionArray[0];
+						stageJson.girlfriend[0] = displayX = spr.x - char.positionArray[0] - CoolUtil.designCutout();
 						stageJson.girlfriend[1] = displayY = spr.y - char.positionArray[1];
 					case 'dad':
-						stageJson.opponent[0] = displayX = spr.x - char.positionArray[0];
-						stageJson.opponent[1] = displayY = spr.y - char.positionArray[1];
+						if(char.curCharacter.startsWith('gf'))
+						{
+							stageJson.girlfriend[0] = displayX = spr.x - char.positionArray[0] - CoolUtil.designCutout();
+							stageJson.girlfriend[1] = displayY = spr.y - char.positionArray[1];
+						}
+						else
+						{
+							stageJson.opponent[0] = displayX = spr.x - char.positionArray[0] - CoolUtil.designCutout();
+							stageJson.opponent[1] = displayY = spr.y - char.positionArray[1];
+						}
 				}
 				posTxt.text = 'X: $displayX\nY: $displayY';
 			}
@@ -1907,19 +1992,22 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 	function repositionGirlfriend()
 	{
-		gf.setPosition(stageJson.girlfriend[0], stageJson.girlfriend[1]);
+		gf.setPosition(stageJson.girlfriend[0] + CoolUtil.designCutout(), stageJson.girlfriend[1]);
 		gf.x += gf.positionArray[0];
 		gf.y += gf.positionArray[1];
 	}
 	function repositionDad()
 	{
-		dad.setPosition(stageJson.opponent[0], stageJson.opponent[1]);
+		if(dad.curCharacter.startsWith('gf'))
+			dad.setPosition(stageJson.girlfriend[0] + CoolUtil.designCutout(), stageJson.girlfriend[1]);
+		else
+			dad.setPosition(stageJson.opponent[0] + CoolUtil.designCutout(), stageJson.opponent[1]);
 		dad.x += dad.positionArray[0];
 		dad.y += dad.positionArray[1];
 	}
 	function repositionBoyfriend()
 	{
-		boyfriend.setPosition(stageJson.boyfriend[0], stageJson.boyfriend[1]);
+		boyfriend.setPosition(stageJson.boyfriend[0] + CoolUtil.designCutout(), stageJson.boyfriend[1]);
 		boyfriend.x += boyfriend.positionArray[0];
 		boyfriend.y += boyfriend.positionArray[1];
 	}
@@ -2021,12 +2109,27 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 	function doSaveData(?convertLua:Bool = false)
 	{
 		saveObjectsToJson(convertLua);
-		var data = haxe.Json.stringify(stageJson, '\t');
-		#if mobile
-		unsavedProgress = false;
-		StorageUtil.saveContent('$lastLoadedStage.json', data);
+		var data:String = haxe.Json.stringify(stageJson, '\t');
+		#if (MODS_ALLOWED && sys)
+		openSubState(new Prompt('Save the stage as a file, or replace it in the current mod?', function()
+		{
+			saveToMod(data, convertLua);
+		}, function()
+		{
+			saveToFile(data);
+		}, 'Replace in Mod', 'Export JSON'));
 		#else
-		if (data.length > 0)
+		saveToFile(data);
+		#end
+	}
+
+	function saveToFile(data:String):Void
+	{
+		#if mobile
+		StorageUtil.saveContent('$lastLoadedStage.json', data);
+		unsavedProgress = false;
+		#else
+		if(data.length > 0)
 		{
 			_file = new FileReference();
 			_file.addEventListener(#if desktop Event.SELECT #else Event.COMPLETE #end, onSaveComplete);
@@ -2037,6 +2140,155 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		#end
 	}
 
+	#if sys
+	function ensureDirectory(path:String):Void
+	{
+		var current:String = StringTools.startsWith(path, '/') ? '/' : '';
+		for(part in path.split('/'))
+		{
+			if(part.length < 1) continue;
+			if(current.length > 0 && !StringTools.endsWith(current, '/')) current += '/';
+			current += part;
+			if(!FileSystem.exists(current)) FileSystem.createDirectory(current);
+		}
+	}
+
+	function patchLuaSpriteCoordinates(source:String, tag:String, x:Float, y:Float, changeX:Bool, changeY:Bool):String
+	{
+		var number:String = "[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?";
+		var xValue:String = Std.string(x);
+		var yValue:String = Std.string(y);
+
+		// Standard Psych Engine form: makeLuaSprite(tag, image, x, y).
+		var standard:EReg = new EReg("(makeLuaSprite\\s*\\(\\s*(['\"])([^'\"]+)\\2\\s*,\\s*[^,]+,\\s*)(" + number + ")(\\s*,\\s*)(" + number + ")(\\s*\\))", "gi");
+		source = standard.map(source, function(r:EReg)
+		{
+			if(r.matched(3) != tag) return r.matched(0);
+			return r.matched(1) + (changeX ? xValue : r.matched(4)) + r.matched(5) + (changeY ? yValue : r.matched(6)) + r.matched(7);
+		});
+
+		// Also support the shorthand makeLuaSprite(tag, x, y).
+		var shorthand:EReg = new EReg("(makeLuaSprite\\s*\\(\\s*(['\"])([^'\"]+)\\2\\s*,\\s*)(" + number + ")(\\s*,\\s*)(" + number + ")(\\s*\\))", "gi");
+		source = shorthand.map(source, function(r:EReg)
+		{
+			if(r.matched(3) != tag) return r.matched(0);
+			return r.matched(1) + (changeX ? xValue : r.matched(4)) + r.matched(5) + (changeY ? yValue : r.matched(6)) + r.matched(7);
+		});
+		return source;
+	}
+
+	#if LUA_ALLOWED
+	function saveKeptLuaSpritePositions(modName:String):Bool
+	{
+		if(luaSpriteTags.length < 1) return true;
+		if(stageLua == null || stageLua.scriptName == null || !FileSystem.exists(stageLua.scriptName))
+		{
+			showOutput('Load the stage Lua script before saving Lua sprite positions.', true);
+			return false;
+		}
+
+		var luaTarget:String = Paths.mods(modName + '/stages/' + lastLoadedStage + '.lua');
+		ensureDirectory(Paths.mods(modName + '/stages/'));
+		try
+		{
+			if(!FileSystem.exists(luaTarget))
+				File.copy(stageLua.scriptName, luaTarget);
+
+			var original:String = File.getContent(luaTarget);
+			var updated:String = original;
+			var updatedMetas:Array<StageEditorMetaSprite> = [];
+			for(meta in stageSprites)
+			{
+				if(meta == null || meta.type != 'lua' || meta.name == null) continue;
+				var changeX:Bool = Math.abs(meta.x - meta.luaOriginalX) >= 0.000001;
+				var changeY:Bool = Math.abs(meta.y - meta.luaOriginalY) >= 0.000001;
+				if(!changeX && !changeY) continue;
+				var next:String = patchLuaSpriteCoordinates(updated, meta.name, meta.x, meta.y, changeX, changeY);
+				if(next != updated)
+				{
+					updated = next;
+					updatedMetas.push(meta);
+				}
+			}
+			if(updated != original)
+			{
+				File.saveContent(luaTarget, updated);
+				for(meta in updatedMetas)
+				{
+					meta.luaOriginalX = meta.x;
+					meta.luaOriginalY = meta.y;
+				}
+			}
+			return true;
+		}
+		catch(e:Dynamic)
+		{
+			showOutput('Could not update stage Lua: ' + Std.string(e), true);
+			return false;
+		}
+	}
+	#end
+
+	function saveToMod(data:String, convertLua:Bool):Void
+	{
+		#if MODS_ALLOWED
+		var modName:String = Mods.currentModDirectory;
+		if(modName == null || modName.length < 1)
+		{
+			showOutput('Select a mod before replacing a stage file.', true);
+			return;
+		}
+		try
+		{
+			var stageFolder:String = Paths.mods(modName + '/stages/');
+			ensureDirectory(stageFolder);
+			var target:String = stageFolder + lastLoadedStage + '.json';
+			var backupRoot:String = #if android StorageUtil.getExternalStorageDirectory() + 'backup/' #else Sys.getCwd() + '.PsychEngine/backup/' #end;
+			var backupFolder:String = backupRoot + modName + '/stages/' + lastLoadedStage + '/';
+			ensureDirectory(backupFolder);
+
+			var luaTarget:String = stageFolder + lastLoadedStage + '.lua';
+			if(FileSystem.exists(target) || FileSystem.exists(luaTarget))
+			{
+				var backupStamp:String = 'stage_' + Date.now().getTime();
+				if(FileSystem.exists(target)) File.copy(target, backupFolder + backupStamp + '.json');
+				if(FileSystem.exists(luaTarget)) File.copy(luaTarget, backupFolder + backupStamp + '.lua');
+
+				var backupVersions:Array<String> = [];
+				for(file in FileSystem.readDirectory(backupFolder))
+				{
+					if(!StringTools.startsWith(file, 'stage_')) continue;
+					var extension:Int = file.lastIndexOf('.');
+					var version:String = extension > 0 ? file.substr(0, extension) : file;
+					if(!backupVersions.contains(version)) backupVersions.push(version);
+				}
+				backupVersions.sort(function(a:String, b:String):Int return a < b ? -1 : (a > b ? 1 : 0));
+				while(backupVersions.length > 2)
+				{
+					var oldest:String = backupVersions.shift();
+					for(extension in ['.json', '.lua'])
+					{
+						var oldBackup:String = backupFolder + oldest + extension;
+						if(FileSystem.exists(oldBackup)) FileSystem.deleteFile(oldBackup);
+					}
+				}
+			}
+
+			#if LUA_ALLOWED
+			if(!convertLua && !saveKeptLuaSpritePositions(modName)) return;
+			#end
+			File.saveContent(target, data);
+			unsavedProgress = false;
+			showOutput('Saved $lastLoadedStage.json to mod "$modName".', false);
+		}
+		catch(e:Dynamic)
+		{
+			showOutput('Could not save stage to mod: ' + Std.string(e), true);
+		}
+		#end
+	}
+	#end
+
 	var _file:FileReference;
 	function onSaveComplete(_):Void
 	{
@@ -2045,6 +2297,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		_file.removeEventListener(Event.CANCEL, onSaveCancel);
 		_file.removeEventListener(IOErrorEvent.IO_ERROR, onSaveError);
 		_file = null;
+		unsavedProgress = false;
 		FlxG.log.notice('Successfully saved file.');
 	}
 
@@ -2362,6 +2615,8 @@ class StageEditorMetaSprite
 	// "animatedSprite" only variables
 	public var firstAnimation:String;
 	public var animations:Array<AnimArray>;
+	public var luaOriginalX:Float = 0;
+	public var luaOriginalY:Float = 0;
 
 	public function new(data:Dynamic, spr:FlxSprite)
 	{
@@ -2373,6 +2628,15 @@ class StageEditorMetaSprite
 		if(lyr != null) this.layer = Std.int(lyr);
 		switch(this.type)
 		{
+			case 'lua':
+				this.name = data.name != null ? data.name : 'luaSprite';
+			case 'combo':
+				this.name = data.name != null ? data.name : 'Combo';
+				for (v in ['scale', 'scroll', 'color', 'filters', 'antialiasing'])
+				{
+					var dat:Dynamic = Reflect.field(data, v);
+					if(dat != null) Reflect.setField(this, v, dat);
+				}
 			case 'sprite', 'square', 'animatedSprite':
 				for (v in ['name', 'image', 'scale', 'scroll', 'color', 'filters', 'antialiasing'])
 				{
@@ -2393,6 +2657,11 @@ class StageEditorMetaSprite
 		var obj:Dynamic = {type: type};
 		switch(type)
 		{
+			case 'combo':
+				obj.name = 'Combo';
+				obj.x = x;
+				obj.y = y;
+				obj.filters = filters;
 			case 'square', 'sprite', 'animatedSprite':
 				obj.name = name;
 				obj.x = x;

@@ -1093,14 +1093,23 @@ class FunkinLua {
 			}
 		});
 
-		Lua_helper.add_callback(lua, "makeLuaSprite", function(tag:String, ?image:String = null, ?x:Float = 0, ?y:Float = 0) {
+		Lua_helper.add_callback(lua, "makeLuaSprite", function(tag:String, ?image:Dynamic = null, ?x:Float = 0, ?y:Float = 0) {
+			var originalTag:String = tag;
 			tag = tag.replace('.', '');
+			if(image != null && !Std.isOfType(image, String))
+			{
+				// Shorthand form: makeLuaSprite(tag, x, y).
+				y = x;
+				x = Std.parseFloat(Std.string(image));
+				image = null;
+			}
 			if(stagePreviewMode && !stagePreviewTags.contains(tag)) stagePreviewTags.push(tag);
 			LuaUtils.destroyObject(tag);
 			var leSprite:ModchartSprite = new ModchartSprite(x, y);
-			if(image != null && image.length > 0)
+			leSprite.luaTag = originalTag;
+			if(image != null && Std.string(image).length > 0)
 			{
-				leSprite.loadGraphic(Paths.image(image));
+				leSprite.loadGraphic(Paths.image(Std.string(image)));
 			}
 			MusicBeatState.getVariables().set(tag, leSprite);
 			leSprite.active = true;
@@ -1143,10 +1152,12 @@ class FunkinLua {
 		});
 		#end
 		Lua_helper.add_callback(lua, "makeAnimatedLuaSprite", function(tag:String, ?image:String = null, ?x:Float = 0, ?y:Float = 0, ?spriteType:String = 'auto') {
+			var originalTag:String = tag;
 			tag = tag.replace('.', '');
 			if(stagePreviewMode && !stagePreviewTags.contains(tag)) stagePreviewTags.push(tag);
 			LuaUtils.destroyObject(tag);
 			var leSprite:ModchartSprite = new ModchartSprite(x, y);
+			leSprite.luaTag = originalTag;
 
 			if(image != null && image.length > 0)
 			{
@@ -1221,6 +1232,7 @@ class FunkinLua {
 			}
 		});
 		Lua_helper.add_callback(lua, "addLuaSprite", function(tag:String, ?inFront:Bool = false) {
+			tag = tag.replace('.', '');
 			var mySprite:FlxSprite = MusicBeatState.getVariables().get(tag);
 			if(mySprite == null) return;
 
@@ -1306,6 +1318,7 @@ class FunkinLua {
 		});
 
 		Lua_helper.add_callback(lua, "removeLuaSprite", function(tag:String, destroy:Bool = true, ?group:String = null) {
+			tag = tag.replace('.', '');
 			var obj:FlxSprite = LuaUtils.getObjectDirectly(tag);
 			if(obj == null || obj.destroy == null)
 				return;

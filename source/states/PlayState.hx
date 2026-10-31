@@ -289,6 +289,9 @@ class PlayState extends MusicBeatState
 
 	// Biến local của create() nhưng cần dùng lại ở các phase sau → đưa thành field
 	var stageData:StageFile;
+	var comboOnStage:Bool = false;
+	var comboStageX:Float = 0;
+	var comboStageY:Float = 0;
 	var camPos:FlxPoint;
 
 	public var luaTouchPad:TouchPad;
@@ -390,6 +393,20 @@ class PlayState extends MusicBeatState
 		curStage = SONG.stage;
 
 		stageData = StageData.getStageFile(curStage);
+		comboOnStage = false;
+		if(stageData.objects != null)
+		{
+			for(stageObject in stageData.objects)
+			{
+				if(stageObject != null && stageObject.type == 'combo')
+				{
+					comboOnStage = true;
+					comboStageX = stageObject.x;
+					comboStageY = stageObject.y;
+					break;
+				}
+			}
+		}
 		defaultCamZoom = stageData.defaultZoom;
 
 		stageUI = "normal";
@@ -656,7 +673,7 @@ class PlayState extends MusicBeatState
 
 		uiGroup.cameras = [camHUD];
 		noteGroup.cameras = [camHUD];
-		comboGroup.cameras = [camHUD];
+		comboGroup.cameras = [comboOnStage ? camGame : camHUD];
 
 		startingSong = true;
 
@@ -2889,8 +2906,9 @@ class PlayState extends MusicBeatState
 		{
 			rating.loadGraphic(Paths.image(uiFolder + daRating.image + uiPostfix));
 			rating.screenCenter();
-			rating.x = placement - 40;
-			rating.y -= 60;
+			rating.x = comboOnStage ? comboStageX - 40 : placement - 40;
+			if(comboOnStage) rating.y = comboStageY - 60;
+			else rating.y -= 60;
 			rating.acceleration.y = 550 * playbackRate * playbackRate;
 			rating.velocity.y -= FlxG.random.int(140, 175) * playbackRate;
 			rating.velocity.x -= FlxG.random.int(0, 10) * playbackRate;
@@ -2901,14 +2919,17 @@ class PlayState extends MusicBeatState
 
 			var comboSpr:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiFolder + 'combo' + uiPostfix));
 			comboSpr.screenCenter();
-			comboSpr.x = placement;
+			comboSpr.x = comboOnStage ? comboStageX : placement;
 			comboSpr.acceleration.y = FlxG.random.int(200, 300) * playbackRate * playbackRate;
 			comboSpr.velocity.y -= FlxG.random.int(140, 160) * playbackRate;
 			comboSpr.visible = (!ClientPrefs.data.hideHud && showCombo);
 			comboSpr.x += ClientPrefs.data.comboOffset[0];
-			comboSpr.y -= ClientPrefs.data.comboOffset[1];
+			if(comboOnStage) comboSpr.y = comboStageY + 60 - ClientPrefs.data.comboOffset[1];
+			else {
+				comboSpr.y -= ClientPrefs.data.comboOffset[1];
+				comboSpr.y += 60;
+			}
 			comboSpr.antialiasing = antialias;
-			comboSpr.y += 60;
 			comboSpr.velocity.x += FlxG.random.int(1, 10) * playbackRate;
 			comboGroup.add(rating);
 
@@ -2936,8 +2957,9 @@ class PlayState extends MusicBeatState
 			{
 				var numScore:FlxSprite = new FlxSprite().loadGraphic(Paths.image(uiFolder + 'num' + Std.parseInt(separatedScore.charAt(i)) + uiPostfix));
 				numScore.screenCenter();
-				numScore.x = placement + (43 * daLoop) - 90 + ClientPrefs.data.comboOffset[2];
-				numScore.y += 80 - ClientPrefs.data.comboOffset[3];
+				numScore.x = (comboOnStage ? comboStageX : placement) + (43 * daLoop) - 90 + ClientPrefs.data.comboOffset[2];
+				if(comboOnStage) numScore.y = comboStageY + 80 - ClientPrefs.data.comboOffset[3];
+				else numScore.y += 80 - ClientPrefs.data.comboOffset[3];
 
 				if (!PlayState.isPixelStage)
 					numScore.setGraphicSize(Std.int(numScore.width * 0.5));
