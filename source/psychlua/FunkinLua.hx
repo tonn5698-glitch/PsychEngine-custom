@@ -369,7 +369,7 @@ class FunkinLua {
 			if(game == null || game.videoManager == null) return -1.0;
 			var video:VideoSprite = game.videoManager.get(name);
 			if(video == null || video.videoSprite == null || video.videoSprite.bitmap == null) return -1.0;
-			return video.videoSprite.bitmap.length;
+			return Std.parseFloat(Std.string(video.videoSprite.bitmap.length));
 		});
 		Lua_helper.add_callback(lua, "skipVideoAndSeek", function(name:String, target:Float) {
 			if(game == null || game.videoManager == null || game.videoManager.get(name) == null) return false;
