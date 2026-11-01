@@ -1602,6 +1602,9 @@ class PlayState extends MusicBeatState
 		var oldNote:Note = null;
 		var sectionsData:Array<SwagSection> = PlayState.SONG.notes;
 		var ghostNotesCaught:Int = 0;
+		// Avoid the old O(n²) ghost-note scan on large charts.
+		// Keyed by the exact chart timestamp + column + side + note type.
+		var generatedHeads:Map<String, Note> = new Map<String, Note>();
 		var daBpm:Float = Conductor.bpm;
 	
 		for (section in sectionsData)
@@ -1621,23 +1624,21 @@ class PlayState extends MusicBeatState
 
 				var gottaHitNote:Bool = (songNotes[1] < totalColumns);
 
-				if (i != 0) {
-					// CLEAR ANY POSSIBLE GHOST NOTES
-					for (evilNote in unspawnNotes) {
-						var matches: Bool = (noteColumn == evilNote.noteData && gottaHitNote == evilNote.mustPress && evilNote.noteType == noteType);
-						if (matches && Math.abs(spawnTime - evilNote.strumTime) < flixel.math.FlxMath.EPSILON) {
-							if (evilNote.tail.length > 0)
-								for (tail in evilNote.tail)
-								{
-									tail.destroy();
-									unspawnNotes.remove(tail);
-								}
-							evilNote.destroy();
-							unspawnNotes.remove(evilNote);
-							ghostNotesCaught++;
-							//continue;
+				// CLEAR ANY POSSIBLE GHOST NOTES without scanning the whole chart.
+				var ghostKey:String = Std.string(spawnTime) + '|' + noteColumn + '|' + gottaHitNote + '|' + Std.string(noteType);
+				var evilNote:Note = generatedHeads.get(ghostKey);
+				if (evilNote != null && Math.abs(spawnTime - evilNote.strumTime) < flixel.math.FlxMath.EPSILON)
+				{
+					if (evilNote.tail.length > 0)
+						for (tail in evilNote.tail)
+						{
+							tail.destroy();
+							unspawnNotes.remove(tail);
 						}
-					}
+					evilNote.destroy();
+					unspawnNotes.remove(evilNote);
+					generatedHeads.remove(ghostKey);
+					ghostNotesCaught++;
 				}
 
 				var swagNote:Note = new Note(spawnTime, noteColumn, oldNote);
@@ -1650,6 +1651,7 @@ class PlayState extends MusicBeatState
 	
 				swagNote.scrollFactor.set();
 				unspawnNotes.push(swagNote);
+				generatedHeads.set(ghostKey, swagNote);
 
 				var curStepCrochet:Float = 60 / daBpm * 1000 / 4.0;
 				final roundSus:Int = Math.round(swagNote.sustainLength / curStepCrochet);
@@ -1722,6 +1724,8 @@ class PlayState extends MusicBeatState
 			}
 		}
 		trace('["${SONG.song.toUpperCase()}" CHART INFO]: Ghost Notes Cleared: $ghostNotesCaught');
+		// The lookup is only needed during generation; release it before sorting/playing.
+		generatedHeads = null;
 		for (event in songData.events) //Event Notes
 			for (i in 0...event[1].length)
 				makeEvent(event, i);

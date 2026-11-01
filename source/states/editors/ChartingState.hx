@@ -2519,70 +2519,134 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 		var minTime:Float = getMinNoteTime(curSec);
 		var maxTime:Float = getMaxNoteTime(curSec);
-		function curSecFilter(note:MetaNote)
-		{
-			return (note.strumTime >= minTime && note.strumTime < maxTime);
-		}
 
-		var firstNote:Bool = false;
-		var firstEvent:Bool = false;
-		sectionFirstNoteID = 0;
-		sectionFirstEventID = 0;
-		for (num => note in notes)
+		// notes/events are kept sorted by time. Binary-search their visible range
+		// instead of scanning the entire chart every time the section changes.
+		var noteStart:Int = 0;
+		var noteEnd:Int = notes.length;
+		while(noteStart < noteEnd)
 		{
-			if(note != null && curSecFilter(note))
-			{
-				if(!firstNote) sectionFirstNoteID = num;
-				curRenderedNotes.add(note);
-				note.alpha = (note.strumTime >= Conductor.songPosition) ? 1 : 0.6;
-				if(note.hasSustain) note.updateSustainToZoom(cachedSectionCrochets[curSec] / 4, curZoom);
-			}
+			var mid:Int = (noteStart + noteEnd) >> 1;
+			if(notes[mid] != null && notes[mid].strumTime < minTime) noteStart = mid + 1;
+			else noteEnd = mid;
+		}
+		var noteRangeStart:Int = noteStart;
+		noteEnd = notes.length;
+		while(noteStart < noteEnd)
+		{
+			var mid:Int = (noteStart + noteEnd) >> 1;
+			if(notes[mid] != null && notes[mid].strumTime < maxTime) noteStart = mid + 1;
+			else noteEnd = mid;
+		}
+		var noteRangeEnd:Int = noteStart;
+
+		sectionFirstNoteID = noteRangeStart;
+		sectionFirstEventID = 0;
+		for(num in noteRangeStart...noteRangeEnd)
+		{
+			var note = notes[num];
+			if(note == null) continue;
+			curRenderedNotes.add(note);
+			note.alpha = (note.strumTime >= Conductor.songPosition) ? 1 : 0.6;
+			if(note.hasSustain) note.updateSustainToZoom(cachedSectionCrochets[curSec] / 4, curZoom);
 		}
 
 		if(SHOW_EVENT_COLUMN)
 		{
-			for (num => event in events)
+			var eventStart:Int = 0;
+			var eventEnd:Int = events.length;
+			while(eventStart < eventEnd)
 			{
-				if(event != null && curSecFilter(event))
-				{
-					if(!firstEvent) sectionFirstEventID = num;
-					curRenderedNotes.add(event);
-					event.alpha = (event.strumTime >= Conductor.songPosition) ? 1 : 0.6;
-					event.eventText.visible = true;
-				}
+				var mid:Int = (eventStart + eventEnd) >> 1;
+				if(events[mid] != null && events[mid].strumTime < minTime) eventStart = mid + 1;
+				else eventEnd = mid;
+			}
+			var eventRangeStart:Int = eventStart;
+			eventEnd = events.length;
+			while(eventStart < eventEnd)
+			{
+				var mid:Int = (eventStart + eventEnd) >> 1;
+				if(events[mid] != null && events[mid].strumTime < maxTime) eventStart = mid + 1;
+				else eventEnd = mid;
+			}
+			var eventRangeEnd:Int = eventStart;
+			sectionFirstEventID = eventRangeStart;
+
+			for(num in eventRangeStart...eventRangeEnd)
+			{
+				var event = events[num];
+				if(event == null) continue;
+				curRenderedNotes.add(event);
+				event.alpha = (event.strumTime >= Conductor.songPosition) ? 1 : 0.6;
+				event.eventText.visible = true;
 			}
 		}
 
-		if(!onlyCurrent)
+		if(!onlyCurrent && (showPreviousSection || showNextSection))
 		{
-			if(showPreviousSection || showNextSection)
+			function addBehindNotes(rangeMin:Float, rangeMax:Float):Void
 			{
-				var prevMinTime:Float = getMinNoteTime(curSec-1);
-				var prevMaxTime:Float = getMaxNoteTime(curSec-1);
-				var nextMinTime:Float = getMinNoteTime(curSec+1);
-				var nextMaxTime:Float = getMaxNoteTime(curSec+1);
-				function otherSecFilter(note:MetaNote)
+				var start:Int = 0;
+				var end:Int = notes.length;
+				while(start < end)
 				{
-					return (prevGridBg.visible && (note.strumTime >= prevMinTime && note.strumTime < prevMaxTime)) ||
-						(nextGridBg.visible && (note.strumTime >= nextMinTime && note.strumTime < nextMaxTime));
+					var mid:Int = (start + end) >> 1;
+					if(notes[mid] != null && notes[mid].strumTime < rangeMin) start = mid + 1;
+					else end = mid;
 				}
-	
-				for(note in notes.filter(otherSecFilter))
+				var from:Int = start;
+				end = notes.length;
+				while(start < end)
 				{
+					var mid:Int = (start + end) >> 1;
+					if(notes[mid] != null && notes[mid].strumTime < rangeMax) start = mid + 1;
+					else end = mid;
+				}
+				for(num in from...start)
+				{
+					var note = notes[num];
+					if(note == null) continue;
 					behindRenderedNotes.add(note);
 					note.alpha = 0.4;
 					if(note.hasSustain) note.updateSustainToZoom(cachedSectionCrochets[curSec] / 4, curZoom);
 				}
+			}
 
-				if(SHOW_EVENT_COLUMN)
+			if(prevGridBg.visible) addBehindNotes(getMinNoteTime(curSec - 1), getMaxNoteTime(curSec - 1));
+			if(nextGridBg.visible) addBehindNotes(getMinNoteTime(curSec + 1), getMaxNoteTime(curSec + 1));
+
+			if(SHOW_EVENT_COLUMN)
+			{
+				function addBehindEvents(rangeMin:Float, rangeMax:Float):Void
 				{
-					for(event in events.filter(otherSecFilter))
+					var start:Int = 0;
+					var end:Int = events.length;
+					while(start < end)
 					{
+						var mid:Int = (start + end) >> 1;
+						if(events[mid] != null && events[mid].strumTime < rangeMin) start = mid + 1;
+						else end = mid;
+					}
+					var from:Int = start;
+					end = events.length;
+					while(start < end)
+					{
+						var mid:Int = (start + end) >> 1;
+						if(events[mid] != null && events[mid].strumTime < rangeMax) start = mid + 1;
+						else end = mid;
+					}
+					for(num in from...start)
+					{
+						var event = events[num];
+						if(event == null) continue;
 						behindRenderedNotes.add(event);
 						event.alpha = 0.4;
 						event.eventText.visible = false;
 					}
 				}
+
+				if(prevGridBg.visible) addBehindEvents(getMinNoteTime(curSec - 1), getMaxNoteTime(curSec - 1));
+				if(nextGridBg.visible) addBehindEvents(getMinNoteTime(curSec + 1), getMaxNoteTime(curSec + 1));
 			}
 		}
 	}
