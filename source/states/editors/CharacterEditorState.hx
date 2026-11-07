@@ -75,6 +75,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 	var cameraPosition:Point = new Point();
 	var isDragging:Bool = false;
 	var cameraLocked:Bool = false; // Khóa camera: drag không di chuyển
+	public var editorMoveCameraEnabled:Bool = false;
 	var lastDragMouseX:Float = 0;
 	var lastDragMouseY:Float = 0;
 	// cursorIndicator đã khai báo trong MusicBeatState (base class)
@@ -325,6 +326,16 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 		UI_box.selectedName = 'Settings';
 		UI_characterbox.selectedName = 'Character';
+	}
+
+	/** Public bridge for runtime editor extensions to add controls without accessing private UI fields. */
+	public function addEditorExtensionControl(tabName:String, control:Dynamic):Bool
+	{
+		if(UI_box == null || control == null) return false;
+		var tab = UI_box.getTab(tabName);
+		if(tab == null || tab.menu == null) return false;
+		tab.menu.add(control);
+		return true;
 	}
 
 	function addStagePreviewUI()
@@ -666,6 +677,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		});
 		tab_group.add(camLockText);
 		tab_group.add(camLockBtn);
+
 	}
 
 	var animationDropDown:PsychUIDropDownMenu;
@@ -1125,29 +1137,78 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		var changedOffset = false;
 		var moveKeysP = (controls.mobileC) ? [touchPad.buttonLeft.justPressed, touchPad.buttonRight.justPressed, touchPad.buttonUp.justPressed, touchPad.buttonDown.justPressed] : [FlxG.keys.justPressed.LEFT, FlxG.keys.justPressed.RIGHT, FlxG.keys.justPressed.UP, FlxG.keys.justPressed.DOWN];
 		var moveKeys =  (controls.mobileC) ? [touchPad.buttonLeft.pressed, touchPad.buttonRight.pressed, touchPad.buttonUp.pressed, touchPad.buttonDown.pressed] : [FlxG.keys.pressed.LEFT, FlxG.keys.pressed.RIGHT, FlxG.keys.pressed.UP, FlxG.keys.pressed.DOWN];
-		if(moveKeysP.contains(true))
-		{
-			character.offset.x += ((moveKeysP[0] ? 1 : 0) - (moveKeysP[1] ? 1 : 0)) * shiftMultBig;
-			character.offset.y += ((moveKeysP[2] ? 1 : 0) - (moveKeysP[3] ? 1 : 0)) * shiftMultBig;
-			changedOffset = true;
-		}
+		var moveX:Float = (moveKeysP[1] ? 1 : 0) - (moveKeysP[0] ? 1 : 0);
+		var moveY:Float = (moveKeysP[3] ? 1 : 0) - (moveKeysP[2] ? 1 : 0);
+		var cameraChanged:Bool = false;
 
-		if(moveKeys.contains(true))
+		if(editorMoveCameraEnabled)
 		{
-			holdingArrowsTime += elapsed;
-			if(holdingArrowsTime > 0.6)
+			if(moveKeysP.contains(true))
 			{
-				holdingArrowsElapsed += elapsed;
-				while(holdingArrowsElapsed > (1/60))
+				moveCameraTarget(moveX, moveY, shiftMultBig);
+				cameraChanged = true;
+			}
+
+			if(moveKeys.contains(true))
+			{
+				holdingArrowsTime += elapsed;
+				if(holdingArrowsTime > 0.6)
 				{
-					character.offset.x += ((moveKeys[0] ? 1 : 0) - (moveKeys[1] ? 1 : 0)) * shiftMultBig;
-					character.offset.y += ((moveKeys[2] ? 1 : 0) - (moveKeys[3] ? 1 : 0)) * shiftMultBig;
-					holdingArrowsElapsed -= (1/60);
-					changedOffset = true;
+					holdingArrowsElapsed += elapsed;
+					while(holdingArrowsElapsed > (1/60))
+					{
+						var heldX:Float = (moveKeys[1] ? 1 : 0) - (moveKeys[0] ? 1 : 0);
+						var heldY:Float = (moveKeys[3] ? 1 : 0) - (moveKeys[2] ? 1 : 0);
+						moveCameraTarget(heldX, heldY, shiftMultBig);
+						holdingArrowsElapsed -= (1/60);
+						cameraChanged = true;
+					}
 				}
 			}
+			else
+			{
+				holdingArrowsTime = 0;
+				holdingArrowsElapsed = 0;
+			}
+
+			if(cameraChanged)
+			{
+				updatePointerPos();
+				if(positionCameraXStepper != null) positionCameraXStepper.value = character.cameraPosition[0];
+				if(positionCameraYStepper != null) positionCameraYStepper.value = character.cameraPosition[1];
+				unsavedProgress = true;
+			}
 		}
-		else holdingArrowsTime = 0;
+		else
+		{
+			if(moveKeysP.contains(true))
+			{
+				character.offset.x += ((moveKeysP[0] ? 1 : 0) - (moveKeysP[1] ? 1 : 0)) * shiftMultBig;
+				character.offset.y += ((moveKeysP[2] ? 1 : 0) - (moveKeysP[3] ? 1 : 0)) * shiftMultBig;
+				changedOffset = true;
+			}
+
+			if(moveKeys.contains(true))
+			{
+				holdingArrowsTime += elapsed;
+				if(holdingArrowsTime > 0.6)
+				{
+					holdingArrowsElapsed += elapsed;
+					while(holdingArrowsElapsed > (1/60))
+					{
+						character.offset.x += ((moveKeys[0] ? 1 : 0) - (moveKeys[1] ? 1 : 0)) * shiftMultBig;
+						character.offset.y += ((moveKeys[2] ? 1 : 0) - (moveKeys[3] ? 1 : 0)) * shiftMultBig;
+						holdingArrowsElapsed -= (1/60);
+						changedOffset = true;
+					}
+				}
+			}
+			else
+			{
+				holdingArrowsTime = 0;
+				holdingArrowsElapsed = 0;
+			}
+		}
 
 		if(FlxG.mouse.pressedRight && (FlxG.mouse.deltaScreenX != 0 || FlxG.mouse.deltaScreenY != 0))
 		{
@@ -1316,6 +1377,15 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		/////////////
 
 		Paths.currentLevel = lastLoaded;
+	}
+
+	inline function moveCameraTarget(dx:Float, dy:Float, amount:Float):Void
+	{
+		if(character == null) return;
+
+		// camera_position.x uses the opposite sign for playable characters.
+		character.cameraPosition[0] += dx * amount * (character.isPlayer ? -1 : 1);
+		character.cameraPosition[1] += dy * amount;
 	}
 
 	inline function updatePointerPos(?snap:Bool = true)
