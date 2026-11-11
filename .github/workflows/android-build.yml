@@ -2,7 +2,7 @@ name: Android Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, debug]
     paths:
       - 'source/**'
       - 'assets/**'
@@ -24,6 +24,6 @@ jobs:
         name: Android
         os: macos-15
         setupCommand: sh ./setup/unix.sh
-        buildArgs: "android -final -arm64"
-        artifactName: androidBuild
-        artifactPath: "export/release/android/bin/app/build/outputs/apk/release/*.apk"
+        buildArgs: ${{ github.ref_name == 'debug' && 'android -debug -arm64' || 'android -final -arm64' }}
+        artifactName: ${{ github.ref_name == 'debug' && 'androidBuild-debug' || 'androidBuild' }}
+        artifactPath: ${{ github.ref_name == 'debug' && 'export/debug/android/bin/app/build/outputs/apk/debug/*.apk' || 'export/release/android/bin/app/build/outputs/apk/release/*.apk' }}

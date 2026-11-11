@@ -204,6 +204,11 @@ class Main extends Sprite
 
 		addChild(new FlxGame(gameW, gameH, #if COPYSTATE_ALLOWED !CopyState.checkExistingFiles() ? CopyState : #end game.initialState, game.framerate, game.framerate, game.skipSplash, game.startFullscreen));
 
+		#if HSCRIPT_ALLOWED
+		backend.DynamicRuntime.init();
+		FlxG.signals.postUpdate.add(function() backend.DynamicRuntime.update(FlxG.elapsed));
+		#end
+
 		fpsVar = new FPSCounter(10, 3, 0xFFFFFF);
 		addChild(fpsVar);
 		Lib.current.stage.align = "tl";
