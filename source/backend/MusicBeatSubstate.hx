@@ -108,8 +108,17 @@ class MusicBeatSubstate extends FlxSubState
 		}
 	}
 
+	override function create()
+	{
+		if (backend.psychcne.CNEModManager.isActive()) backend.psychcne.CNEScriptRuntime.attachSubState(this);
+		super.create();
+		if (backend.psychcne.CNEModManager.isActive())
+			backend.psychcne.CNEScriptRuntime.subStateCreate(this);
+	}
+
 	override function destroy()
 	{
+		if (backend.psychcne.CNEModManager.isActive()) backend.psychcne.CNEScriptRuntime.destroySubState(this);
 		controls.isInSubstate = false;
 		removeTouchPad();
 		removeMobileControls();
@@ -120,6 +129,7 @@ class MusicBeatSubstate extends FlxSubState
 
 	override function update(elapsed:Float)
 	{
+		if (backend.psychcne.CNEModManager.isActive()) backend.psychcne.CNEScriptRuntime.subStateUpdate(this, elapsed);
 		//everyStep();
 		if(!persistentUpdate) MusicBeatState.timePassedOnState += elapsed;
 		var oldStep:Int = curStep;
@@ -145,6 +155,7 @@ class MusicBeatSubstate extends FlxSubState
 		}
 
 		super.update(elapsed);
+		if (backend.psychcne.CNEModManager.isActive()) backend.psychcne.CNEScriptRuntime.subStatePostUpdate(this, elapsed);
 	}
 
 	private function updateSection():Void
@@ -199,6 +210,7 @@ class MusicBeatSubstate extends FlxSubState
 	{
 		if (curStep % 4 == 0)
 			beatHit();
+		if (backend.psychcne.CNEModManager.isActive()) backend.psychcne.CNEScriptRuntime.subStateStepHit(this, curStep);
 	}
 
 	public function beatHit():Void
@@ -206,6 +218,7 @@ class MusicBeatSubstate extends FlxSubState
 		// Funky Mode: bop HUD/menu members theo beat (chỉ ngoài PlayState)
 		if (FunkyMode.shouldBop())
 			FunkyMode.bopMembers(members);
+		if (backend.psychcne.CNEModManager.isActive()) backend.psychcne.CNEScriptRuntime.subStateBeatHit(this, curBeat);
 	}
 	
 	public function sectionHit():Void

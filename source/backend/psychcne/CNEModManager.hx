@@ -1,6 +1,7 @@
 package backend.psychcne;
 
 import backend.Mods;
+import backend.Paths;
 
 #if sys
 import sys.FileSystem;
@@ -37,6 +38,61 @@ class CNEModManager
 		#end
 	}
 
+	static function recognizedPath():String
+		return rootPath() + "recognizedMods.txt";
+
+	static function readRecognized():Array<String>
+	{
+		var result:Array<String> = [];
+		#if sys
+		ensureRoot();
+		if (FileSystem.exists(recognizedPath()))
+			for (line in File.getContent(recognizedPath()).split("\n"))
+			{
+				var name = StringTools.trim(StringTools.replace(line, "\r", ""));
+				if (name.length > 0 && !result.contains(name)) result.push(name);
+			}
+		#end
+		return result;
+	}
+
+	public static function isRecognized(folder:String):Bool
+	{
+		if (folder == null) return false;
+		if (StringTools.endsWith(folder.toLowerCase(), "_polymod")) return true;
+		return readRecognized().contains(folder);
+	}
+
+	public static function setRecognized(folder:String, enabled:Bool):Void
+	{
+		#if sys
+		if (folder == null || folder.length == 0) return;
+		var list = readRecognized();
+		if (enabled && !list.contains(folder)) list.push(folder);
+		if (!enabled) list.remove(folder);
+		if (!enabled && getEnabledMods().contains(folder)) setEnabled(folder, false);
+		File.saveContent(recognizedPath(), list.join("\n"));
+		refreshList();
+		#end
+	}
+
+	/** Returns the active CNE mod's actual folder, whether it lives in modsCNE or was manually marked in a Psych root. */
+	public static function modPath(folder:String):String
+	{
+		#if sys
+		var dedicated = rootPath() + folder + "/";
+		if (FileSystem.isDirectory(dedicated)) return dedicated;
+		#if MODS_ALLOWED
+		for (root in Paths.modRootDirs)
+		{
+			var candidate = Paths.modsRootByName(root) + folder + "/";
+			if (FileSystem.isDirectory(candidate)) return candidate;
+		}
+		#end
+		#end
+		return rootPath() + folder + "/";
+	}
+
 	public static function getAvailableMods():Array<String>
 	{
 		var result:Array<String> = [];
@@ -45,9 +101,25 @@ class CNEModManager
 		for (entry in FileSystem.readDirectory(rootPath()))
 		{
 			var path = rootPath() + entry;
-			if (FileSystem.isDirectory(path) && entry != "." && entry != "..")
+			if (FileSystem.isDirectory(path) && entry != "." && entry != ".." && !result.contains(entry))
 				result.push(entry);
 		}
+		#if MODS_ALLOWED
+		var recognized = readRecognized();
+		for (root in Paths.modRootDirs)
+		{
+			var modsRoot = Paths.modsRootByName(root);
+			if (!FileSystem.exists(modsRoot)) continue;
+			for (entry in FileSystem.readDirectory(modsRoot))
+			{
+				var path = modsRoot + entry;
+				var automatic = StringTools.endsWith(entry.toLowerCase(), "_polymod");
+				if (FileSystem.isDirectory(path) && !Mods.ignoreModFolders.contains(entry.toLowerCase())
+					&& (automatic || recognized.contains(entry)) && !result.contains(entry))
+					result.push(entry);
+			}
+		}
+		#end
 		#end
 		result.sort(Reflect.compare);
 		return result;
@@ -124,27 +196,19 @@ class CNEModManager
 	}
 
 	public static function getActiveMod():String
-	{
-		refreshMode();
 		return activeMod;
-	}
 
 	public static function hasInvalidSelection():Bool
-	{
-		refreshMode();
 		return invalidEnabledCount > 1;
-	}
 
 	public static function isActive():Bool
-	{
-		refreshMode();
 		return activeMod != null;
-	}
 
 	/** Exactly one CNE mod may be enabled. */
 	public static function setEnabled(folder:String, enabled:Bool):Bool
 	{
 		if (folder == null || !getAvailableMods().contains(folder)) return false;
+		if (isActive()) CNEScriptRuntime.shutdown();
 		var entries = readEntries();
 		var found = false;
 		for (entry in entries)
@@ -178,10 +242,12 @@ class CNEModManager
 	 * can recreate only the scripts belonging to the newly active engine layer. */
 	static function resetPsychGlobalScripts():Void
 	{
+		CNEScriptRuntime.shutdown();
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 		var globals = psychlua.PsychGlobalScript.instance;
 		if (globals != null)
 		{
+			globals.callOnScripts('onDestroy', []);
 			#if LUA_ALLOWED
 			if (globals.luaArray != null)
 				for (lua in globals.luaArray) if (lua != null) lua.stop();
@@ -195,6 +261,57 @@ class CNEModManager
 		}
 		psychlua.PsychGlobalScript.instance = null;
 		#end
+	}
+
+	public static function getStateRedirects():Map<String, String>
+	{
+		var redirects:Map<String, String> = [];
+		#if sys
+		if (!isActive()) return redirects;
+		var file = modPath(getActiveMod()) + "data/config/modpack.ini";
+		if (!FileSystem.exists(file)) return redirects;
+		var section = "";
+		for (line in File.getContent(file).split("\n"))
+		{
+			var clean = StringTools.trim(StringTools.replace(line, "\r", ""));
+			if (clean.length == 0 || StringTools.startsWith(clean, ";") || StringTools.startsWith(clean, "#")) continue;
+			if (StringTools.startsWith(clean, "[") && StringTools.endsWith(clean, "]"))
+			{
+				section = StringTools.trim(clean.substr(1, clean.length - 2));
+				continue;
+			}
+			if (section != "StateRedirects" && section != "StateRedirects.force") continue;
+			var split = clean.indexOf("=");
+			if (split <= 0) continue;
+			var key = StringTools.trim(clean.substr(0, split));
+			var value = StringTools.trim(clean.substr(split + 1));
+			if (key.length == 0 || value.length == 0) continue;
+			if (section == "StateRedirects.force" || !redirects.exists(key)) redirects.set(key, value);
+		}
+		#end
+		return redirects;
+	}
+
+	public static function resolveState(nextState:flixel.FlxState):flixel.FlxState
+	{
+		if (nextState == null || !isActive()) return nextState;
+		var className = Type.getClassName(Type.getClass(nextState));
+		if (className == null) return nextState;
+		var shortName = className.substr(className.lastIndexOf(".") + 1);
+		var redirects = getStateRedirects();
+		if (!redirects.exists(shortName)) return nextState;
+		var target = redirects.get(shortName);
+		var resolved = Type.resolveClass(target);
+		if (resolved != null)
+		{
+			try
+			{
+				var instance:Dynamic = Type.createInstance(resolved, []);
+				if (Std.isOfType(instance, flixel.FlxState)) return cast instance;
+			}
+			catch (e:Dynamic) trace('[PsychCNE] Could not instantiate redirected state ' + target + ': ' + Std.string(e));
+		}
+		return new funkin.backend.scripting.ModState(target);
 	}
 
 	public static function refreshMode():Void

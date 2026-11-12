@@ -63,7 +63,8 @@ class Mods
 				for (folder in Paths.readDirectory(modsFolder))
 				{
 					var path = haxe.io.Path.join([modsFolder, folder]);
-					if (FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase()) && !list.contains(folder))
+					if (FileSystem.isDirectory(path) && !ignoreModFolders.contains(folder.toLowerCase())
+						&& !CNEModManager.isRecognized(folder) && !list.contains(folder))
 						list.push(folder);
 				}
 			}
@@ -272,6 +273,14 @@ class Mods
 		} catch(e) {
 			trace(e);
 		}
+		// CNE-recognized folders are never loaded as Psych mods. Keep the source
+		// modsList.txt untouched; this is only an in-memory classification.
+		var cneEnabled = list.enabled.filter(function(folder) return CNEModManager.isRecognized(folder));
+		for (folder in cneEnabled)
+		{
+			list.enabled.remove(folder);
+			if (!list.disabled.contains(folder)) list.disabled.push(folder);
+		}
 		#end
 		return list;
 	}
@@ -309,7 +318,7 @@ class Mods
 			{
 				var path:String = haxe.io.Path.join([modsFolder, folder]);
 				if(FileSystem.isDirectory(path) && folder.trim().length > 0
-					&& !ignoreModFolders.contains(folder.toLowerCase()) && !added.contains(folder))
+					&& !ignoreModFolders.contains(folder.toLowerCase()) && !CNEModManager.isRecognized(folder) && !added.contains(folder))
 				{
 					added.push(folder);
 					list.push([folder, true]);

@@ -3,13 +3,15 @@ package funkin.backend.scripting;
 import flixel.FlxState;
 import backend.MusicBeatState;
 import backend.psychcne.CNEModManager;
+#if HSCRIPT_ALLOWED
+import backend.psychcne.CNEScript;
+#end
 
 /**
- * ModState — state chạy theo file HScript kiểu Codename Engine.
- * Khác CustomState (gọi tên hàm Psych onXxx), ModState cũng gọi tên hàm CNE
- * (new/create/update/destroy/beatHit/stepHit) — gọi CNE trước, rồi fallback Psych.
+ * ModState — custom state chạy theo script HScript của Codename Engine.
+ * Lifecycle hỗ trợ new/create/postCreate/update/destroy/beatHit/stepHit và alias onXxx của Psych.
  *
- * Vị trí script: mods/<Mod>/data/states/<scriptName>.hx (hoặc assets/shared/data/states/...)
+ * Script được tìm trong thư mục mod CNE đang hoạt động: data/states/<scriptName>.*
  */
 class ModState extends backend.MusicBeatState
 {
@@ -17,6 +19,9 @@ class ModState extends backend.MusicBeatState
 	public static var lastData:Dynamic = null;
 	public var data:Dynamic = null;
 	public var scriptName:String;
+	#if HSCRIPT_ALLOWED
+	var cneScripts:Array<CNEScript> = [];
+	#end
 
 	public function new(_stateName:String, ?_data:Dynamic)
 	{
@@ -36,7 +41,7 @@ class ModState extends backend.MusicBeatState
 		if (file != null)
 		{
 			trace('[ModState] load script: ' + file);
-			initHScript(file);
+			initCNEScript(file);
 		}
 		else
 		{
@@ -44,9 +49,9 @@ class ModState extends backend.MusicBeatState
 		}
 		#end
 
-		callLifecycle('new');
-		callLifecycle('create');
 		callLifecycle('onCreate', [scriptName]);
+		callLifecycle('create');
+		callLifecycle('postCreate', []);
 		callLifecycle('createPost', []);
 		callLifecycle('onCreatePost', [scriptName]);
 	}
@@ -78,11 +83,31 @@ class ModState extends backend.MusicBeatState
 	{
 		callLifecycle('destroy');
 		callLifecycle('onDestroy', [scriptName]);
+		#if HSCRIPT_ALLOWED
+		for (script in cneScripts) if (script != null) script.destroy();
+		cneScripts = [];
+		#end
 		super.destroy();
 	}
 
-	function callLifecycle(func:String, ?args:Array<Dynamic>)
-		callOnScripts(func, args);
+	#if HSCRIPT_ALLOWED
+	function initCNEScript(file:String):Void
+	{
+		try
+		{
+			var script = new CNEScript(file, this);
+			cneScripts.push(script);
+		}
+		catch (e:Dynamic) trace('[ModState] Script load failed: ' + Std.string(e));
+	}
+	#end
+
+	function callLifecycle(func:String, ?args:Array<Dynamic>):Void
+	{
+		#if HSCRIPT_ALLOWED
+		for (script in cneScripts) if (script != null) script.call(func, args == null ? [] : args);
+		#end
+	}
 
 	function findScript():String
 	{
@@ -92,9 +117,13 @@ class ModState extends backend.MusicBeatState
 		if (CNEModManager.isActive())
 		{
 			var active:String = CNEModManager.getActiveMod();
-			var cnePath:String = CNEModManager.rootPath() + active + '/' + path;
+			var base:String = CNEModManager.modPath(active) + 'data/states/' + scriptName;
 			#if sys
-			if (sys.FileSystem.exists(cnePath)) return cnePath;
+			for (ext in ['hx', 'hscript', 'hsc', 'hxs'])
+			{
+				var cnePath:String = base + '.' + ext;
+				if (sys.FileSystem.exists(cnePath)) return cnePath;
+			}
 			#end
 			return null;
 		}

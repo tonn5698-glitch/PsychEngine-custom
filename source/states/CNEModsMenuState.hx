@@ -71,6 +71,12 @@ class CNEModsMenuState extends MusicBeatState
 		}
 	}
 
+	function goBack():Void
+	{
+		if (CNEModManager.isActive()) MusicBeatState.switchState(new MainMenuState());
+		else MusicBeatState.switchState(new ModsMenuState());
+	}
+
 	function toggleMod(index:Int):Void
 	{
 		if (index < 0 || index >= modFolders.length) return;
@@ -86,7 +92,7 @@ class CNEModsMenuState extends MusicBeatState
 		super.update(elapsed);
 		if (FlxG.keys.justPressed.ESCAPE || FlxG.keys.justPressed.BACKSPACE)
 		{
-			MusicBeatState.switchState(new ModsMenuState());
+			goBack();
 			return;
 		}
 		if (FlxG.keys.justPressed.UP && modRows.length > 0)
@@ -103,7 +109,7 @@ class CNEModsMenuState extends MusicBeatState
 		{
 			if (TouchUtil.overlaps(backText))
 			{
-				MusicBeatState.switchState(new ModsMenuState());
+				goBack();
 				return;
 			}
 			for (i in 0...modRows.length)
@@ -119,7 +125,7 @@ class CNEModsMenuState extends MusicBeatState
 		{
 			if (FlxG.mouse.overlaps(backText))
 			{
-				MusicBeatState.switchState(new ModsMenuState());
+				goBack();
 				return;
 			}
 			for (i in 0...modRows.length)

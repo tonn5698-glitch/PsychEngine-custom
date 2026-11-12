@@ -1736,6 +1736,8 @@ class PlayState extends MusicBeatState
 
 	// called only once per different event (Used for precaching)
 	function eventPushed(event:EventNote) {
+		if (backend.psychcne.CNEModManager.isActive())
+			backend.psychcne.CNEScriptRuntime.eventPushed(event.event, event.value1, event.value2, event.strumTime);
 		eventPushedUnique(event);
 		if(eventsPushed.contains(event.event)) {
 			return;
@@ -2369,6 +2371,20 @@ class PlayState extends MusicBeatState
 	}
 
 	public function triggerEvent(eventName:String, value1:String, value2:String, strumTime:Float) {
+		if (backend.psychcne.CNEModManager.isActive())
+		{
+			if (eventName == "__CNE Camera Movement")
+			{
+				applyCNECameraMovement(value1);
+				return;
+			}
+			if (eventName == "__CNE Camera Position")
+			{
+				applyCNECameraPosition(value1);
+				return;
+			}
+			if (backend.psychcne.CNEScriptRuntime.callEvent(eventName, value1, value2, strumTime)) return;
+		}
 		var flValue1:Null<Float> = Std.parseFloat(value1);
 		var flValue2:Null<Float> = Std.parseFloat(value2);
 		if(Math.isNaN(flValue1)) flValue1 = null;
@@ -2614,7 +2630,66 @@ class PlayState extends MusicBeatState
 		callOnScripts('onEvent', [eventName, value1, value2, strumTime]);
 	}
 
+	public function applyCNECameraMovement(rawParams:String):Void
+	{
+		var params:Array<Dynamic>;
+		try params = cast haxe.Json.parse(rawParams) catch (e:Dynamic) return;
+		if (params == null || params.length < 8) return;
+
+		var lineType = Std.int(params[0]);
+		var targetCharacter = Std.string(params[1]);
+		var target:Dynamic = null;
+		if (lineType == 1) moveCamera(false);
+		else if (lineType == 0) moveCamera(true);
+		else if (targetCharacter == "gf" || targetCharacter == "girlfriend")
+		{
+			if (gf != null) moveCameraToGirlfriend();
+		}
+		else
+		{
+			if (boyfriendMap.exists(targetCharacter)) target = boyfriendMap.get(targetCharacter);
+			else if (dadMap.exists(targetCharacter)) target = dadMap.get(targetCharacter);
+			if (target != null)
+			{
+				var midpoint = target.getMidpoint();
+				camFollow.setPosition(midpoint.x, midpoint.y);
+				camFollow.x += target.cameraPosition[0];
+				camFollow.y += target.cameraPosition[1];
+			}
+			else moveCamera(true);
+		}
+
+		camFollow.x += Std.parseFloat(Std.string(params[6]));
+		camFollow.y += Std.parseFloat(Std.string(params[7]));
+		if (params[2] == false)
+		{
+			FlxG.camera.scroll.set(camFollow.x - FlxG.camera.width * 0.5, camFollow.y - FlxG.camera.height * 0.5);
+		}
+	}
+
+	public function applyCNECameraPosition(rawParams:String):Void
+	{
+		var params:Array<Dynamic>;
+		try params = cast haxe.Json.parse(rawParams) catch (e:Dynamic) return;
+		if (params == null || params.length < 7) return;
+
+		var x = Std.parseFloat(Std.string(params[0]));
+		var y = Std.parseFloat(Std.string(params[1]));
+		if (Math.isNaN(x) || Math.isNaN(y)) return;
+		if (params[6] == true)
+		{
+			camFollow.x += x;
+			camFollow.y += y;
+		}
+		else camFollow.setPosition(x, y);
+
+		if (params[2] == false)
+			FlxG.camera.scroll.set(camFollow.x - FlxG.camera.width * 0.5, camFollow.y - FlxG.camera.height * 0.5);
+	}
+
 	public function moveCameraSection(?sec:Null<Int>):Void {
+		// CNE charts control camera focus through timestamped chart events, not mustHitSection.
+		if (backend.psychcne.CNEModManager.isActive()) return;
 		if(sec == null) sec = curSection;
 		if(sec < 0) sec = 0;
 
@@ -3246,6 +3321,7 @@ class PlayState extends MusicBeatState
 	}
 
 	function noteMiss(daNote:Note):Void { //You didn't hit the key and let it go offscreen, also used by Hurt Notes
+		if (backend.psychcne.CNEModManager.isActive() && backend.psychcne.CNEScriptRuntime.noteMiss(daNote)) return;
 		//Dupe note remove
 		notes.forEachAlive(function(note:Note) {
 			if (daNote != note && daNote.mustPress && daNote.noteData == note.noteData && daNote.isSustainNote == note.isSustainNote && Math.abs(daNote.strumTime - note.strumTime) < 1)
@@ -3414,6 +3490,7 @@ class PlayState extends MusicBeatState
 
 	public function goodNoteHit(note:Note):Void
 	{
+		if (backend.psychcne.CNEModManager.isActive() && backend.psychcne.CNEScriptRuntime.noteHit(note)) return;
 		if(note.wasGoodHit) return;
 		if(cpuControlled && note.ignoreNote) return;
 

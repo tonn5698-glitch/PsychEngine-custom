@@ -643,7 +643,7 @@ class Paths
 	inline static public function mods(key:String = '')
 	{
 		if (CNEModManager.isActive())
-			return CNEModManager.rootPath() + CNEModManager.getActiveMod() + '/' + key;
+			return CNEModManager.modPath(CNEModManager.getActiveMod()) + key;
 		return #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end currentModRoot + '/' + key;
 	}
 
@@ -714,9 +714,9 @@ class Paths
 		// CNE mode resolves assets only from the selected modsCNE folder.
 		if (CNEModManager.isActive())
 		{
-			var cneFile:String = CNEModManager.rootPath() + CNEModManager.getActiveMod() + '/' + key;
+			var cneFile:String = CNEModManager.modPath(CNEModManager.getActiveMod()) + key;
 			if (FileSystem.exists(cneFile)) return cneFile;
-			return CNEModManager.rootPath() + CNEModManager.getActiveMod() + '/' + key;
+			return CNEModManager.modPath(CNEModManager.getActiveMod()) + key;
 		}
 
 		// 1. Check currentModDirectory trong TẤT CẢ root dirs

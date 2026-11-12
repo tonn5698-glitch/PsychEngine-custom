@@ -4,6 +4,7 @@ import flixel.input.keyboard.FlxKey;
 import flixel.input.gamepad.FlxGamepadInputID;
 
 import objects.Character;
+import backend.psychcne.CNEModManager;
 
 import options.Option.OptionType;
 
@@ -28,9 +29,17 @@ class ModSettingsSubState extends BaseOptionsMenu
 		}
 
 		//save = []; //reset for debug purposes
+		var modOptions:Array<Dynamic> = options == null ? [] : options.copy();
+		modOptions.push({
+			name: 'Codename Engine mod',
+			description: 'Treat this folder as a Codename Engine mod. It will be isolated from Psych mods when activated.',
+			save: 'psychCNEEnabled',
+			type: 'bool',
+			value: CNEModManager.isRecognized(folder)
+		});
 		try
 		{
-			for (option in options)
+			for (option in modOptions)
 			{
 				var newOption = new Option(
 					option.name != null ? option.name : option.save,
@@ -181,6 +190,7 @@ class ModSettingsSubState extends BaseOptionsMenu
 	override public function close()
 	{
 		FlxG.save.data.modSettings.set(folder, save);
+		if (!_crashed) CNEModManager.setRecognized(folder, save.get('psychCNEEnabled') == true);
 		FlxG.save.flush();
 		super.close();
 	}

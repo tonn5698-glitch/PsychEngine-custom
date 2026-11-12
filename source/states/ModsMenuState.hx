@@ -150,6 +150,7 @@ class ModsMenuState extends MusicBeatState
 			buttonEnableAll.ignoreCheck = false;
 			for (mod in modsGroup.members)
 			{
+				if (mod == null || CNEModManager.isRecognized(mod.folder)) continue;
 				if(modsList.disabled.contains(mod.folder))
 				{
 					modsList.disabled.remove(mod.folder);
@@ -171,6 +172,7 @@ class ModsMenuState extends MusicBeatState
 			buttonDisableAll.ignoreCheck = false;
 			for (mod in modsGroup.members)
 			{
+				if (mod == null || CNEModManager.isRecognized(mod.folder)) continue;
 				if(modsList.enabled.contains(mod.folder))
 				{
 					modsList.enabled.remove(mod.folder);
@@ -273,9 +275,9 @@ class ModsMenuState extends MusicBeatState
 		settingsButton = new MenuButton(buttonsX + 300, buttonsY, 80, 80, Paths.image('modsMenuButtons'), function() //Settings
 		{
 			var curMod:ModItem = modsGroup.members[curSelectedMod];
-			if(curMod != null && curMod.settings != null && curMod.settings.length > 0)
+			if(curMod != null)
 			{
-				openSubState(new ModSettingsSubState(curMod.settings, curMod.folder, curMod.name));
+				openSubState(new ModSettingsSubState(curMod.settings == null ? [] : curMod.settings, curMod.folder, curMod.name));
 			}
 		}, 54, 54);
 
@@ -284,13 +286,17 @@ class ModsMenuState extends MusicBeatState
 		add(settingsButton);
 		buttons.push(settingsButton);
 
-		if(modsGroup.members[curSelectedMod].settings == null || modsGroup.members[curSelectedMod].settings.length < 1)
-			settingsButton.enabled = false;
+		settingsButton.enabled = modsGroup.members[curSelectedMod] != null;
 
 		var button = new MenuButton(buttonsX + 400, buttonsY, 80, 80, Paths.image('modsMenuButtons'), function() //On/Off
 		{
 			var curMod:ModItem = modsGroup.members[curSelectedMod];
 			var mod:String = curMod.folder;
+			if (CNEModManager.isRecognized(mod))
+			{
+				MusicBeatState.switchState(new CNEModsMenuState());
+				return;
+			}
 			if(!modsList.disabled.contains(mod)) //Enable
 			{
 				modsList.enabled.remove(mod);
@@ -747,7 +753,7 @@ class ModsMenuState extends MusicBeatState
 		modDesc.text = curMod.desc;
 
 		for (button in buttons) if(button.focusChangeCallback != null) button.focusChangeCallback(button.onFocus);
-		settingsButton.enabled = (curMod.settings != null && curMod.settings.length > 0);
+		settingsButton.enabled = curMod != null;
 	}
 
 	var centerMod:Int = 2;
@@ -829,9 +835,24 @@ class ModsMenuState extends MusicBeatState
 		// CNE mode must never rewrite the Psych Engine mod list.
 		if (CNEModManager.isActive()) return;
 		var fileStr:String = '';
+		var originalCNE:Map<String, String> = [];
+		for (line in CoolUtil.coolTextFile(Mods.modsListPath()))
+		{
+			var data = line.split('|');
+			if (data.length > 1 && CNEModManager.isRecognized(data[0])) originalCNE.set(data[0], data[1]);
+		}
 		for (mod in modsList.all)
 		{
 			if(mod.trim().length < 1) continue;
+			if (CNEModManager.isRecognized(mod))
+			{
+				if (originalCNE.exists(mod))
+				{
+					if (fileStr.length > 0) fileStr += '\n';
+					fileStr += mod + '|' + originalCNE.get(mod);
+				}
+				continue;
+			}
 
 			if(fileStr.length > 0) fileStr += '\n';
 
