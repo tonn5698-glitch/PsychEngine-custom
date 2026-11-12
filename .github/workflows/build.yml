@@ -72,7 +72,7 @@ jobs:
       - name: Install Libraries
         run: |
           ${{ inputs.setupCommand }}
-          haxelib install hscript-improved --quiet
+          haxelib git hscript-improved https://github.com/FNF-CNE-Devs/hscript-improved.git --quiet
 
       - name: Install hxdr_libs (mp3 support)
         shell: bash
