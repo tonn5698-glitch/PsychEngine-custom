@@ -70,7 +70,9 @@ jobs:
           key: haxelib-${{ runner.os }}-${{ env.HAXE_VERSION }}-${{ hashFiles('setup/windows.bat', 'Project.xml') }}
 
       - name: Install Libraries
-        run: ${{ inputs.setupCommand }}
+        run: |
+          ${{ inputs.setupCommand }}
+          haxelib install hscript-improved --quiet
 
       - name: Install hxdr_libs (mp3 support)
         shell: bash
