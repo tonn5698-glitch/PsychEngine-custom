@@ -22,6 +22,7 @@ import haxe.io.Bytes;
 
 #if MODS_ALLOWED
 import backend.Mods;
+import backend.psychcne.CNEModManager;
 #end
 
 @:access(openfl.display.BitmapData)
@@ -640,7 +641,11 @@ class Paths
 	public static var currentModRoot:String = 'mods';
 
 	inline static public function mods(key:String = '')
+	{
+		if (CNEModManager.isActive())
+			return CNEModManager.rootPath() + CNEModManager.getActiveMod() + '/' + key;
 		return #if android StorageUtil.getExternalStorageDirectory() + #else Sys.getCwd() + #end currentModRoot + '/' + key;
+	}
 
 	// Trả về root path hiện tại (không có key)
 	inline static public function modsRoot():String
@@ -706,6 +711,14 @@ class Paths
 
 	static public function modFolders(key:String)
 	{
+		// CNE mode resolves assets only from the selected modsCNE folder.
+		if (CNEModManager.isActive())
+		{
+			var cneFile:String = CNEModManager.rootPath() + CNEModManager.getActiveMod() + '/' + key;
+			if (FileSystem.exists(cneFile)) return cneFile;
+			return CNEModManager.rootPath() + CNEModManager.getActiveMod() + '/' + key;
+		}
+
 		// 1. Check currentModDirectory trong TẤT CẢ root dirs
 		if(Mods.currentModDirectory != null && Mods.currentModDirectory.length > 0)
 		{

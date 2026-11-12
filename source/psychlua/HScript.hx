@@ -4,6 +4,7 @@ import flixel.FlxBasic;
 import objects.Character;
 import psychlua.LuaUtils;
 import psychlua.CustomSubstate;
+import backend.psychcne.CNEModManager;
 
 #if LUA_ALLOWED
 import psychlua.FunkinLua;
@@ -92,9 +93,14 @@ class HScript extends Iris
 		{
 			this.origin = filePath;
 			#if MODS_ALLOWED
-			var myFolder:Array<String> = filePath.split('/');
-			if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1] || Mods.getGlobalMods().contains(myFolder[1]))) //is inside mods folder
-				this.modFolder = myFolder[1];
+			if (CNEModManager.isActive())
+				this.modFolder = CNEModManager.getActiveMod();
+			else
+			{
+				var myFolder:Array<String> = filePath.split('/');
+				if(myFolder[0] + '/' == Paths.mods() && (Mods.currentModDirectory == myFolder[1] || Mods.getGlobalMods().contains(myFolder[1]))) //is inside mods folder
+					this.modFolder = myFolder[1];
+			}
 			#end
 		}
 		var scriptThing:String = file;

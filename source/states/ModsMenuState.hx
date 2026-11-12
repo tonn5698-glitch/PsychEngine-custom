@@ -11,6 +11,7 @@ import haxe.Json;
 import flixel.util.FlxSpriteUtil;
 import objects.AttachedSprite;
 import options.ModSettingsSubState;
+import backend.psychcne.CNEModManager;
 
 import openfl.display.BitmapData;
 import lime.utils.Assets;
@@ -109,8 +110,16 @@ class ModsMenuState extends MusicBeatState
 		else
 			daY = 20;
 
-		buttonReload = new MenuButton(buttonX, bgList.y + bgList.height + daY, buttonWidth, buttonHeight, Language.getPhrase('reload_button', 'RELOAD'), function() reload());
+		var splitButtonWidth = Std.int((buttonWidth - 20) / 2);
+		buttonReload = new MenuButton(buttonX, bgList.y + bgList.height + daY, splitButtonWidth, buttonHeight, Language.getPhrase('reload_button', 'RELOAD'), function() reload());
 		add(buttonReload);
+
+		var buttonCNE = new MenuButton(buttonX + splitButtonWidth + 20, buttonReload.y, splitButtonWidth, buttonHeight, 'CNE MODS', function() {
+			// Save pending Psych list edits only while the Psych layer is active.
+			if (!CNEModManager.isActive()) saveTxt();
+			MusicBeatState.switchState(new CNEModsMenuState());
+		});
+		add(buttonCNE);
 		
 		var myY = buttonReload.y + buttonReload.bg.height + 20;
 
@@ -817,6 +826,8 @@ class ModsMenuState extends MusicBeatState
 	
 	function saveTxt()
 	{
+		// CNE mode must never rewrite the Psych Engine mod list.
+		if (CNEModManager.isActive()) return;
 		var fileStr:String = '';
 		for (mod in modsList.all)
 		{

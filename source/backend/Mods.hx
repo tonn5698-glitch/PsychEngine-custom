@@ -1,6 +1,7 @@
 package backend;
 
 import openfl.utils.Assets;
+import backend.psychcne.CNEModManager;
 
 import haxe.Json;
 
@@ -34,11 +35,12 @@ class Mods
 	private static var globalMods:Array<String> = [];
 
 	inline public static function getGlobalMods()
-		return globalMods;
+		return CNEModManager.isActive() ? [] : globalMods;
 
 	inline public static function pushGlobalMods() // prob a better way to do this but idc
 	{
 		globalMods = [];
+		if (CNEModManager.isActive()) return globalMods;
 		for(mod in parseList().enabled)
 		{
 			var pack:Dynamic = getPack(mod);
@@ -49,6 +51,8 @@ class Mods
 
 	inline public static function getModDirectories():Array<String>
 	{
+		// CNE mode must not enumerate Psych folders as active content.
+		if (CNEModManager.isActive()) return [];
 		var list:Array<String> = [];
 		#if MODS_ALLOWED
 		// Scan TẤT CẢ root dirs (mods, mods1, mods2...)
@@ -237,7 +241,8 @@ class Mods
 		#if MODS_ALLOWED
 		try {
 			if(!FileSystem.exists(rootDir)) FileSystem.createDirectory(rootDir);
-			if(!FileSystem.exists(perRoot) && FileSystem.exists(legacy))
+			// Never migrate/copy Psych's list while the CNE layer is active.
+			if(!CNEModManager.isActive() && !FileSystem.exists(perRoot) && FileSystem.exists(legacy))
 				File.saveContent(perRoot, File.getContent(legacy));
 		} catch(e:Dynamic) {
 			trace(e);
@@ -247,7 +252,7 @@ class Mods
 	}
 
 	inline public static function parseList():ModsList {
-		if(!updatedOnState) updateModList();
+		if(!updatedOnState && !CNEModManager.isActive()) updateModList();
 		var list:ModsList = {enabled: [], disabled: [], all: []};
 
 		#if MODS_ALLOWED
@@ -329,6 +334,8 @@ class Mods
 	public static function loadTopMod()
 	{
 		Mods.currentModDirectory = '';
+		CNEModManager.refreshList();
+		if (CNEModManager.isActive()) return;
 		
 		#if MODS_ALLOWED
 		var list:Array<String> = Mods.parseList().enabled;

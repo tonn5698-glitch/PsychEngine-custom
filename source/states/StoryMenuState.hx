@@ -62,7 +62,7 @@ class StoryMenuState extends MusicBeatState
 		final reject:String = (controls.mobileC) ? "B" : "BACK";
 
 		#if MODS_ALLOWED
-		var hasMods:Bool = Mods.getModDirectories().length > 0;
+		var hasMods:Bool = Mods.getModDirectories().length > 0 || backend.psychcne.CNEModManager.isActive();
 		#else
 		var hasMods:Bool = false;
 		#end

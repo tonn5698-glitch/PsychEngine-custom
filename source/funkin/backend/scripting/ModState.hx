@@ -2,6 +2,7 @@ package funkin.backend.scripting;
 
 import flixel.FlxState;
 import backend.MusicBeatState;
+import backend.psychcne.CNEModManager;
 
 /**
  * ModState — state chạy theo file HScript kiểu Codename Engine.
@@ -86,6 +87,17 @@ class ModState extends backend.MusicBeatState
 	function findScript():String
 	{
 		var path:String = 'data/states/$scriptName.hx';
+
+		// CNE mode is isolated: never fall through to Psych mods or their globals.
+		if (CNEModManager.isActive())
+		{
+			var active:String = CNEModManager.getActiveMod();
+			var cnePath:String = CNEModManager.rootPath() + active + '/' + path;
+			#if sys
+			if (sys.FileSystem.exists(cnePath)) return cnePath;
+			#end
+			return null;
+		}
 
 		#if MODS_ALLOWED
 		// 1) Quét mọi thư mục mod có trong mods/ (kể cả không phải current)

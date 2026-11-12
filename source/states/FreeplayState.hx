@@ -37,6 +37,7 @@ class FreeplayState extends MusicBeatState
 	function getEnabledMods():Array<String>
 	{
 		var mods:Array<String> = [];
+		if (backend.psychcne.CNEModManager.isActive()) return mods;
 		var list = Mods.parseList();
 		if (list != null && list.enabled != null)
 		{
@@ -101,7 +102,7 @@ class FreeplayState extends MusicBeatState
 		final reject:String = (controls.mobileC) ? "B" : "BACK";
 
 		#if MODS_ALLOWED
-		var hasMods:Bool = Mods.getModDirectories().length > 0;
+		var hasMods:Bool = Mods.getModDirectories().length > 0 || backend.psychcne.CNEModManager.isActive();
 		#else
 		var hasMods:Bool = false;
 		#end
