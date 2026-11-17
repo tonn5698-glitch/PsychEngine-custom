@@ -1574,6 +1574,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 
 	function saveCharacter() {
 		if(_file != null) return;
+		notifyEditorSave(character);
 
 		var json:Dynamic = {
 			"animations": character.animationsArray,

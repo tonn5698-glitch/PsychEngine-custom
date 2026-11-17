@@ -2108,6 +2108,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 	function doSaveData(?convertLua:Bool = false)
 	{
+		notifyEditorSave({stage: stageJson, sprites: stageSprites, convertLua: convertLua});
 		saveObjectsToJson(convertLua);
 		var data:String = haxe.Json.stringify(stageJson, '\t');
 		#if (MODS_ALLOWED && sys)

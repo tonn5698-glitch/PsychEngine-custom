@@ -2,6 +2,7 @@ package backend;
 
 import flixel.FlxState;
 import backend.PsychCamera;
+import backend.ui.PsychUIBox;
 import backend.Mods;
 import psychlua.LuaUtils;
 #if (LUA_ALLOWED || HSCRIPT_ALLOWED)
@@ -151,6 +152,82 @@ class MusicBeatState extends FlxState
 	public var cursorIndicator:flixel.FlxSprite;
 
 	public var variables:Map<String, Dynamic> = new Map<String, Dynamic>();
+
+	/** Returns an editor UI box by its field name (for example: UI_box). */
+	public function getEditorUIBox(boxField:String):PsychUIBox
+	{
+		if (boxField == null || boxField.length < 1 || !Reflect.hasField(this, boxField)) return null;
+		var value:Dynamic = Reflect.field(this, boxField);
+		return Std.isOfType(value, PsychUIBox) ? cast value : null;
+	}
+
+	/** Adds a tab to any editor PsychUIBox. Returns false when the box or tab is invalid. */
+	public function addEditorExtensionTab(boxField:String, tabName:String):Bool
+	{
+		var box:PsychUIBox = getEditorUIBox(boxField);
+		if (box == null || tabName == null || tabName.trim().length < 1 || box.getTab(tabName) != null) return false;
+		box.addTab(tabName);
+		return true;
+	}
+
+	/** Adds a control to a tab in any editor PsychUIBox. */
+	public function addEditorExtensionControlTo(boxField:String, tabName:String, control:Dynamic):Bool
+	{
+		var box:PsychUIBox = getEditorUIBox(boxField);
+		if (box == null || control == null || tabName == null) return false;
+		var tab = box.getTab(tabName);
+		if (tab == null || tab.menu == null) return false;
+		tab.menu.add(control);
+		return true;
+	}
+
+	/** Reads an editor field by name. Prefer editor-specific public APIs when available. */
+	public function getEditorField(fieldName:String):Dynamic
+	{
+		if (fieldName == null || !Reflect.hasField(this, fieldName)) return null;
+		return Reflect.getProperty(this, fieldName);
+	}
+
+	/** Writes an existing editor field. Returns false for unknown fields. */
+	public function setEditorField(fieldName:String, value:Dynamic, markDirty:Bool = true):Bool
+	{
+		if (fieldName == null || !Reflect.hasField(this, fieldName)) return false;
+		try
+		{
+			Reflect.setProperty(this, fieldName, value);
+			if (markDirty) markEditorDirty();
+			return true;
+		}
+		catch (e:Dynamic)
+		{
+			return false;
+		}
+	}
+
+	/** Marks an editor's unsavedProgress flag when that editor uses one. */
+	public function markEditorDirty():Bool
+	{
+		if (!Reflect.hasField(this, 'unsavedProgress')) return false;
+		Reflect.setProperty(this, 'unsavedProgress', true);
+		return true;
+	}
+
+	/** Lets extensions notify other global scripts about editor-specific actions. */
+	public function notifyEditorExtensionEvent(eventName:String, data:Dynamic = null):Void
+	{
+		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+		PsychGlobalScript.notifyEditorEvent('onEditorEvent', this, {event: eventName, data: data});
+		#end
+	}
+
+	/** Called by supported Editors immediately before serializing their save data. */
+	public function notifyEditorSave(data:Dynamic = null):Void
+	{
+		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
+		PsychGlobalScript.notifyEditorEvent('onEditorSave', this, data);
+		#end
+	}
+
 	public static function getVariables()
 		return getState().variables;
 
@@ -160,7 +237,10 @@ class MusicBeatState extends FlxState
 
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
 		PsychGlobalScript.init();
-		PsychGlobalScript.notifyStateSwitch(Type.getClassName(Type.getClass(this)));
+		var stateName:String = Type.getClassName(Type.getClass(this));
+		PsychGlobalScript.notifyStateSwitch(stateName);
+		if (stateName != null && stateName.indexOf('states.editors.') == 0)
+			PsychGlobalScript.notifyEditorEvent('onEditorReady', this, null);
 		#end
 
 		if(!_psychCameraInitialized) initPsychCamera();
@@ -228,7 +308,13 @@ class MusicBeatState extends FlxState
 		}
 
 		#if (LUA_ALLOWED || HSCRIPT_ALLOWED)
-		if (PsychGlobalScript.instance != null) PsychGlobalScript.instance.callOnScripts('onUpdate', [elapsed]);
+		if (PsychGlobalScript.instance != null)
+		{
+			PsychGlobalScript.instance.callOnScripts('onUpdate', [elapsed]);
+			var currentName:String = Type.getClassName(Type.getClass(this));
+			if (currentName != null && currentName.indexOf('states.editors.') == 0)
+				PsychGlobalScript.notifyEditorEvent('onEditorUpdate', this, elapsed);
+		}
 		#end
 		//everyStep();
 		var oldStep:Int = curStep;

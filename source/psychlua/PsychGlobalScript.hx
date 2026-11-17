@@ -138,5 +138,11 @@ class PsychGlobalScript
 	{
 		if (instance != null) instance.callOnScripts('onStateSwitch', [stateName]);
 	}
+
+	/** Dispatches editor lifecycle callbacks to global HScript/Lua extensions. */
+	public static function notifyEditorEvent(callbackName:String, state:Dynamic, data:Dynamic):Void
+	{
+		if (instance != null) instance.callOnScripts(callbackName, [state, data]);
+	}
 }
 #end
