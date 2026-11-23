@@ -1,0 +1,25 @@
+PsychEngine-Custom
+Copyright notices and attributions
+
+This repository is a derivative work distributed under the Apache License, Version 2.0 (see LICENSE).
+
+Origin
+
+* Psych Engine by ShadowMario (Apache License 2.0). This fork is based on Psych Engine.
+* The mobile base used here is the Psych Engine Mobile 1.0.4 archive by kittycathy233, as recorded in Project.md.
+
+Existing copyright headers
+
+Some source files carry the header "Copyright (C) 2025 Mobile Porting Team". Those headers are kept unchanged. The Mobile Porting Team is no longer publicly reachable, so the notices cannot be confirmed with them. The headers are preserved as they appear in the source.
+
+Modifications
+
+The fork-specific changes (Custom States, global scripts, loading overlay and loading gate fixes, VideoManager API, mod gate for Story Mode, Freeplay and the Master Editor, removal of base game content, and related documentation) were made by Ton (tonn5698-glitch), who is the maintainer of this fork. Files modified from their upstream versions are marked as modified in version control history.
+
+Third-party components
+
+Dependencies such as Lime, OpenFL, Flixel, hxcpp, HScript Iris and linc_luajit are used under their own licenses. Refer to each dependency's repository for its terms.
+
+Game content
+
+Friday Night Funkin' content (characters, songs, sprites and related assets) is owned by its respective creators, including ninjamuffin99 and the FNF team. This repository does not grant any rights to that content.
