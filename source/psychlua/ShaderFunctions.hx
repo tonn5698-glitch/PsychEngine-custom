@@ -102,8 +102,10 @@ class ShaderFunctions
 			var filter = new ShaderFilter(shaderObj);
 
 			// Store shader name on camera for later reference
-			if(cam.filters == null) cam.filters = [];
-			cam.filters.push(filter);
+			var newFilters = (cam.filters == null) ? [] : cam.filters.copy();
+			newFilters.push(filter);
+			cam.filtersEnabled = true;
+			cam.setFilters(newFilters);
 
 			return true;
 			#else
@@ -136,7 +138,7 @@ class ShaderFunctions
 			return true;
 		});
 
-		Lua_helper.add_callback(lua, "removeCameraShader", function(camera:String) {
+		Lua_helper.add_callback(lua, "removeCameraShader", function(camera:String, ?shader:String) {
 			#if (!flash && sys)
 			var cam:FlxCamera = LuaUtils.getObjectDirectly(camera);
 			if(cam == null)
@@ -156,7 +158,26 @@ class ShaderFunctions
 			}
 
 			if(cam.filters != null)
-				cam.filters = [];
+			{
+				if(shader == null)
+				{
+					cam.setFilters([]);
+				}
+				else
+				{
+					// remove only this shader's filter; keep the other camera shaders
+					var camKey = camera.toLowerCase();
+					var target:Dynamic = (cameraShaderObjects.exists(camKey) && cameraShaderObjects.get(camKey).exists(shader))
+						? cameraShaderObjects.get(camKey).get(shader) : null;
+					var kept = [];
+					for(f in cam.filters)
+					{
+						var isTarget = (target != null && Std.isOfType(f, ShaderFilter) && cast(f, ShaderFilter).shader == target);
+						if(!isTarget) kept.push(f);
+					}
+					cam.setFilters(kept);
+				}
+			}
 
 			return true;
 			#else
@@ -211,8 +232,10 @@ class ShaderFunctions
 			var arr:Array<String> = funk.runtimeShaders.get(shader);
 			var shaderObj = new shaders.ErrorHandledShader.ErrorHandledRuntimeShader(shader, arr[0], arr[1]);
 			var filterObj = new ShaderFilter(shaderObj);
-			if(cam.filters == null) cam.filters = [];
-			cam.filters.push(filterObj);
+			var newFilters2 = (cam.filters == null) ? [] : cam.filters.copy();
+			newFilters2.push(filterObj);
+			cam.filtersEnabled = true;
+			cam.setFilters(newFilters2);
 			return true;
 			#else
 			FunkinLua.luaTrace("addCameraFilter: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
@@ -232,7 +255,7 @@ class ShaderFunctions
 					case 'camfullscreen': cam = FlxG.cameras.list.length > 1 ? FlxG.cameras.list[1] : null;
 				}
 			}
-			if(cam != null) cam.filters = [];
+			if(cam != null) cam.setFilters([]);
 			return true;
 			#else
 			FunkinLua.luaTrace("clearCameraFilters: Platform unsupported for Runtime Shaders!", false, false, FlxColor.RED);
