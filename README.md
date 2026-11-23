@@ -100,6 +100,10 @@ Full reference: `docs/VideoManager.md`.
 
 The Master Editor Menu includes the Chart Editor, Stage/Character Editors and an extension system. See `docs/EditorExtensions.md`.
 
+## Maintainer
+
+* Ton (tonn5698-glitch) - Creator and lead of PsychEngine-Custom. Handles the fork's direction, ideas, debugging and testing.
+
 ## Mobile Credits:
 * Homura - Head Porter of Psych Engine Mobile.
 * Karim - Second Porter of Psych Engine Mobile.
