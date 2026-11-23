@@ -1843,6 +1843,7 @@ class FunkinLua {
 		CustomFreeplayFunctions.implement(this);
 		CustomMenuFunctions.implement(this);
 		ShaderFunctions.implement(this);
+		FunkinShaderFunctions.implement(this);
 		DeprecatedFunctions.implement(this);
 		MobileFunctions.implement(this);
 		#if android AndroidFunctions.implement(this); #end
