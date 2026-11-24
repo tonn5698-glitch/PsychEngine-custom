@@ -112,10 +112,11 @@ class RenderSongSelectState extends MusicBeatState
             status.text = 'SESSION CREATED  |  ' + songLower + '  |  BPM ' + bpmText
                 + '  |  ' + RenderSession.active.outputWidth + 'x' + RenderSession.active.outputHeight
                 + ' @ ' + RenderSession.active.frameRate + ' FPS';
-            details.text = 'Render session ready\n' + entry.name
+            details.text = 'Opening render gameplay...\n' + entry.name
                 + '\n\nChart sections: ' + chart.notes.length
                 + '\nOutput folder: ' + RenderSession.active.outputDirectory
                 + '\nAudio playback: DISABLED';
+            LoadingState.loadAndSwitchState(new PlayState(), true);
         }
         catch (e:Dynamic)
         {
@@ -129,6 +130,6 @@ class RenderSongSelectState extends MusicBeatState
         if (controls.UI_UP_P && songs.length > 0) { selected = (selected + songs.length - 1) % songs.length; refresh(); }
         if (controls.UI_DOWN_P && songs.length > 0) { selected = (selected + 1) % songs.length; refresh(); }
         if (controls.ACCEPT) createSession();
-        if (controls.BACK) MusicBeatState.switchState(new RenderWorkspaceState(false));
+        if (controls.BACK) { RenderSession.active = null; MusicBeatState.switchState(new RenderWorkspaceState(false)); }
     }
 }

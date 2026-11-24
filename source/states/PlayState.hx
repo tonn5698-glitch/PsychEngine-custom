@@ -286,6 +286,14 @@ class PlayState extends MusicBeatState
 	var creationPhase:Int = 0; // 0 = xong phase 0 (create), 1..5 chờ chạy, 6 = hoàn tất
 	var creationComplete:Bool = false;
 	var overlayPendingRemove:Bool = false;
+	var renderModeActive:Bool = false;
+	var renderPreviousMuted:Bool = false;
+	var renderPreviousFPSVisible:Bool = false;
+	var renderPreviousUpdateFramerate:Int = 60;
+	var renderPreviousDrawFramerate:Int = 60;
+	var renderPreviousMaxAccumulation:Float = 0;
+	var renderStepReady:Bool = false;
+	var renderCompleteText:FlxText;
 
 	// Biến local của create() nhưng cần dùng lại ở các phase sau → đưa thành field
 	var stageData:StageFile;
@@ -298,6 +306,29 @@ class PlayState extends MusicBeatState
 
 	override public function create()
 	{
+		var renderSession = RenderSession.active;
+		if (renderSession != null)
+		{
+			renderModeActive = true;
+			renderPreviousMuted = FlxG.sound.muted;
+			renderPreviousUpdateFramerate = FlxG.updateFramerate;
+			renderPreviousDrawFramerate = FlxG.drawFramerate;
+			@:privateAccess
+			renderPreviousMaxAccumulation = FlxG.game._maxAccumulation;
+			FlxG.sound.muted = true;
+			if (Main.fpsVar != null)
+			{
+				renderPreviousFPSVisible = Main.fpsVar.visible;
+				Main.fpsVar.visible = renderSession.showFPS;
+			}
+			FlxG.updateFramerate = renderSession.frameRate;
+			FlxG.drawFramerate = renderSession.frameRate;
+			@:privateAccess
+			FlxG.game._maxAccumulation = 1000.0 / renderSession.frameRate;
+			FlxG.signals.preUpdate.add(onRenderPreUpdate);
+			FlxG.signals.postDraw.add(onRenderPostDraw);
+		}
+
 		// Mod không có CustomBuild: dùng vùng gameplay legacy 1280x720.
 		backend.GameSize.enterPlayState();
 
@@ -1216,6 +1247,13 @@ class PlayState extends MusicBeatState
 			setOnScripts('startedCountdown', true);
 			callOnScripts('onCountdownStarted');
 
+			if (RenderSession.active != null)
+			{
+				moveCameraSection();
+				startSong();
+				return true;
+			}
+
 			var swagCounter:Int = 0;
 			if (startOnTime > 0) {
 				clearNotesBefore(startOnTime);
@@ -1466,6 +1504,37 @@ class PlayState extends MusicBeatState
 	function startSong():Void
 	{
 		startingSong = false;
+
+		var renderSession = RenderSession.active;
+		if (renderSession != null)
+		{
+			Conductor.songPosition = 0;
+			songLength = inst != null ? inst.length : 0;
+			if (songLength <= 0)
+			{
+				var lastNoteTime:Float = 0;
+				for (section in SONG.notes)
+					for (note in section.sectionNotes)
+					{
+						if (note == null || note.length < 3) continue;
+						var noteEnd:Float = note[0] + Math.max(0, note[2]);
+						if (noteEnd > lastNoteTime) lastNoteTime = noteEnd;
+					}
+				songLength = lastNoteTime + 2000;
+			}
+
+			renderSession.configureDurationMs(songLength);
+			RenderFrameExporter.writeOutputInfo(renderSession, 'rendering');
+			renderSession.audioEnabled = false;
+			renderSession.isRendering = renderSession.totalFrames > 0;
+			if (!renderSession.isRendering)
+				throw 'Render session has no frames to export';
+
+			stagesFunc(function(stage:BaseStage) stage.startSong());
+			setOnScripts('songLength', songLength);
+			callOnScripts('onSongStart');
+			return;
+		}
 
 		@:privateAccess
 		FlxG.sound.playMusic(inst._sound, 1, false);
@@ -1979,6 +2048,22 @@ class PlayState extends MusicBeatState
 		if(overlayPendingRemove && subState == null && !inCutscene && videoCutscene == null)
 			removeLoadingOverlay();
 
+		var renderSession = RenderSession.active;
+		if (renderSession != null && (renderSession.completed || renderSession.failed))
+		{
+			if (controls.BACK)
+			{
+				RenderSession.active = null;
+				MusicBeatState.switchState(new RenderSongSelectState());
+			}
+			return;
+		}
+		if (renderSession != null)
+		{
+			elapsed = 1.0 / renderSession.frameRate;
+			Conductor.songPosition = renderSession.timelinePositionUs / 1000.0;
+		}
+
 		if(!inCutscene && !paused && !freezeCamera) {
 			FlxG.camera.followLerp = 0.04 * cameraSpeed * playbackRate;
 			var idleAnim:Bool = (boyfriend.getAnimationName().startsWith('idle') || boyfriend.getAnimationName().startsWith('danceLeft') || boyfriend.getAnimationName().startsWith('danceRight'));
@@ -2002,6 +2087,14 @@ class PlayState extends MusicBeatState
 		if(botplayTxt != null && botplayTxt.visible) {
 			botplaySine += 180 * elapsed;
 			botplayTxt.alpha = 1 - Math.sin((Math.PI * botplaySine) / 180);
+		}
+
+		if (renderSession != null && controls.BACK)
+		{
+			renderSession.isRendering = false;
+			RenderSession.active = null;
+			MusicBeatState.switchState(new RenderSongSelectState());
+			return;
 		}
 
 		if (controls.PAUSE #if android || FlxG.android.justReleased.BACK #end && startedCountdown && canPause)
@@ -2028,13 +2121,18 @@ class PlayState extends MusicBeatState
 
 		if (startedCountdown && !paused)
 		{
-			Conductor.songPosition += elapsed * 1000 * playbackRate;
-			if (Conductor.songPosition >= Conductor.offset)
+			if (renderSession != null)
+				Conductor.songPosition = renderSession.timelinePositionUs / 1000.0;
+			else
 			{
-				Conductor.songPosition = FlxMath.lerp(FlxG.sound.music.time + Conductor.offset, Conductor.songPosition, Math.exp(-elapsed * 5));
-				var timeDiff:Float = Math.abs((FlxG.sound.music.time + Conductor.offset) - Conductor.songPosition);
-				if (timeDiff > 1000 * playbackRate)
-					Conductor.songPosition = Conductor.songPosition + 1000 * FlxMath.signOf(timeDiff);
+				Conductor.songPosition += elapsed * 1000 * playbackRate;
+				if (Conductor.songPosition >= Conductor.offset)
+				{
+					Conductor.songPosition = FlxMath.lerp(FlxG.sound.music.time + Conductor.offset, Conductor.songPosition, Math.exp(-elapsed * 5));
+					var timeDiff:Float = Math.abs((FlxG.sound.music.time + Conductor.offset) - Conductor.songPosition);
+					if (timeDiff > 1000 * playbackRate)
+						Conductor.songPosition = Conductor.songPosition + 1000 * FlxMath.signOf(timeDiff);
+				}
 			}
 		}
 
@@ -3538,7 +3636,77 @@ class PlayState extends MusicBeatState
 		grpNoteSplashes.add(splash);
 	}
 
+	function onRenderPreUpdate():Void
+	{
+		var session = RenderSession.active;
+		if (!renderModeActive || session == null || !session.isRendering)
+			return;
+
+		// FlxGame's accumulator is capped to one fixed step, so no catch-up updates
+		// can occur before a draw. Mark this draw as having one fresh simulation step.
+		renderStepReady = true;
+		Conductor.songPosition = session.timelinePositionUs / 1000.0;
+	}
+
+	function onRenderPostDraw():Void
+	{
+		var session = RenderSession.active;
+		if (!renderModeActive || session == null || !session.isRendering || !creationComplete || !renderStepReady || FlxG.state != this)
+			return;
+		renderStepReady = false;
+
+		try
+		{
+			RenderFrameExporter.writeCurrentStageFrame(session, session.frameIndex);
+			if (!session.advanceFrame())
+			{
+				session.isRendering = false;
+				RenderFrameExporter.writeOutputInfo(session, 'completed');
+				if (renderCompleteText == null)
+				{
+					renderCompleteText = new FlxText(0, FlxG.height - 48, FlxG.width,
+						'RENDER COMPLETE  |  ' + session.frameIndex + ' PNG FRAMES SAVED  |  ESC TO RETURN', 16);
+					renderCompleteText.setFormat(Paths.font('vcr.ttf'), 16, FlxColor.WHITE, CENTER,
+						FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+					renderCompleteText.scrollFactor.set();
+					renderCompleteText.cameras = [camHUD];
+					add(renderCompleteText);
+				}
+			}
+		}
+		catch (e:Dynamic)
+		{
+			session.isRendering = false;
+			session.failed = true;
+			session.errorMessage = Std.string(e);
+			try RenderFrameExporter.writeOutputInfo(session, 'failed: ' + session.errorMessage) catch (metadataError:Dynamic) trace('Render metadata write failed: ' + metadataError);
+			trace('Render frame export failed: ' + session.errorMessage);
+			if (renderCompleteText == null)
+			{
+				renderCompleteText = new FlxText(0, FlxG.height - 64, FlxG.width,
+					'RENDER FAILED  |  ' + session.errorMessage + '  |  ESC TO RETURN', 14);
+				renderCompleteText.setFormat(Paths.font('vcr.ttf'), 14, FlxColor.RED, CENTER,
+					FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+				renderCompleteText.scrollFactor.set();
+				renderCompleteText.cameras = [camHUD];
+				add(renderCompleteText);
+			}
+		}
+	}
+
 	override function destroy() {
+		if (renderModeActive)
+		{
+			FlxG.signals.preUpdate.remove(onRenderPreUpdate);
+			FlxG.signals.postDraw.remove(onRenderPostDraw);
+			@:privateAccess
+			FlxG.game._maxAccumulation = renderPreviousMaxAccumulation;
+			FlxG.sound.muted = renderPreviousMuted;
+			if (Main.fpsVar != null) Main.fpsVar.visible = renderPreviousFPSVisible;
+			FlxG.updateFramerate = renderPreviousUpdateFramerate;
+			FlxG.drawFramerate = renderPreviousDrawFramerate;
+			renderModeActive = false;
+		}
 		backend.GameSize.leavePlayState();
 
 		// Loading overlay: gỡ camera ngay cả khi bị destroy lúc đang khởi tạo.

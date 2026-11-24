@@ -1089,3 +1089,92 @@ Important: these files are UI/data scaffolding, not a completed renderer. Song s
 - This is the first real data/session wiring only. It does not yet launch a render-specific PlayState, advance deterministic simulation, capture frames, encode PNG/video, or write files.
 - A local Android build/typecheck was started with haxelib run lime test android; final result is pending and must be reported separately.
 - No Git commit/push and no GitHub Actions were used.
+
+
+## Revision 5 — exact frame clock foundation and engine timing audit
+
+Implemented in `source/states/RenderSession.hx`:
+- Added exact per-frame timestamp calculation from the frame index and configured FPS. Timestamps are calculated from the absolute frame index rather than repeatedly adding a rounded frame duration, avoiding cumulative drift at 24/30 FPS.
+- Added adjacent-timestamp frame duration calculation, duration-to-total-frame configuration, one-frame advancement, completion checks, progress reporting, and reset behavior.
+- Kept the clock independent of audio playback and global Conductor state. It is a session-level clock primitive only; it is not yet connected to PlayState.
+
+Validation:
+- A standalone Haxe interpreter test passed for 24 FPS / 1 second: 24 frames, expected fractional-microsecond timestamps, no overrun, progress=1, and reset.
+- An attempted standalone compile against the full project source classpath was not a valid project typecheck because it omitted Lime/OpenFL/HaxeFlixel build defines and dependencies. Do not treat that failed attempt as a source regression or as a successful project compile.
+- The earlier Android build process was still compiling hxcpp C++ translation units during this revision. It started before this RenderSession change, so it cannot validate the new Haxe source.
+
+Engine timing audit:
+- `MusicBeatState.update(elapsed)` derives step/beat/section callbacks from global `Conductor.songPosition`, updates stages, then runs the Flixel state update.
+- `PlayState.update(elapsed)` advances Conductor by elapsed time, but after the song begins it also corrects against `FlxG.sound.music.time`; this audio-clock correction must be bypassed in a true offline render mode.
+- `PlayState.startSong()` starts instrumental and vocal playback and starts a song-sync thread. A render-specific branch must prevent all of these audio-clock behaviors, not merely set volume to zero.
+- HaxeFlixel exposes `FlxG.signals.postDraw`, per-camera `FlxCamera.buffer`, and update/draw framerate controls. These are potential integration points, but capture of the final composite (game + HUD + overlays), exact frame pacing, encoder backpressure, and Android output storage have not yet been implemented or verified.
+- Do not manually call `PlayState.update()` outside the normal FlxGame loop as a shortcut. That would risk desynchronizing Flixel timers/tweens, stage updates, script callbacks, camera rendering, and draw timing.
+
+Current status remains: frame-clock foundation implemented and unit-tested; render-specific PlayState, silent timeline integration, composite frame capture, PNG/video encoding, queue/backpressure, and Gameplay Recorder remain unfinished.
+
+- Added `source/states/RenderFrameExporter.hx`: writes a full-stage snapshot to `frame_000000.png` style files in the session output directory. It scales the OpenFL stage to the session output dimensions, encodes PNG with fast compression, creates the output directory tree, and disposes its temporary BitmapData.
+- The exporter is deliberately synchronous. When invoked from `FlxG.signals.postDraw`, the caller cannot advance to the next frame until encoding and storage finish, providing simple backpressure with no dropped requested frame. This is a PNG image-sequence writer, not a video encoder.
+- Full project Haxe typecheck passed with Android Lime display flags and explicit inclusion of `states.RenderSession` and `states.RenderFrameExporter` (exit code 0, 56.98 seconds).
+- Runtime capture has not yet been tested. The exporter must be called from `FlxG.signals.postDraw`; no PlayState integration currently registers that callback or advances the session clock.
+
+
+## Revision 6 — PlayState render-mode integration
+
+Implemented:
+- `RenderSongSelectState` now launches a `PlayState` after loading the selected chart and creating its session. BACK clears the active session before leaving the selector.
+- `PlayState.create()` detects an active RenderSession, snapshots the current mute/framerate/accumulator settings, mutes audio, applies the selected update/draw frame rate, caps Flixel's fixed-timestep accumulator to one simulation step, and registers render pre-update/post-draw callbacks.
+- `onRenderPreUpdate()` marks that a fresh simulation step is ready and sets Conductor to the session's current timestamp. Flixel's fixed-timestep mode supplies the exact elapsed value to sounds, plugins, state objects, and cameras.
+- Capping `FlxGame._maxAccumulation` to one `_stepMS` means at most one simulation step can occur before a draw. The post-draw callback exports only when the pre-update callback marked a fresh step, preventing duplicate captures on draw-only enter-frames. A slow PNG write blocks before the next frame can be processed.
+- Render-mode `startCountdown()` still creates receptors and invokes countdown-start script callbacks, but skips the timed countdown and countdown sounds.
+- Render-mode `startSong()` does not start instrumental/vocal playback and does not start the song-sync thread. It derives duration from the instrumental length, with a chart-note fallback, configures the session frame count, and invokes stage/script song-start callbacks.
+- The normal PlayState audio-clock correction is bypassed while a RenderSession exists.
+- `postDraw` exports the just-drawn stage as a PNG, then advances the session to the next exact timestamp. Completion or capture failure stops further simulation and displays a status line. ESC returns to the render song selector.
+- Original mute state, update/draw framerates, and Flixel's previous maximum accumulator are restored when PlayState is destroyed.
+- RenderSession now tracks completion/failure state and advances its cursor only after a frame has been exported.
+
+Validation:
+- Updated standalone Haxe interpreter test passed for 24 FPS / 1 second: 24 sequential frame advances, exact timestamps, completion state, progress=1, and reset.
+- Full project Haxe typecheck was run with Android Lime defines and explicit inclusion of PlayState, RenderSongSelectState, RenderSession, and RenderFrameExporter. See final validation result below.
+- `git diff --check` passed at the time of this revision.
+
+Limitations / not yet verified:
+- PNG capture from the live OpenFL stage and output directory permissions have not been tested on an actual Android gameplay session.
+- This produces a PNG image sequence only; no video container/codec encoder exists yet.
+- The `Use Gameplay file` setting is not yet connected to a recorder/replay input stream.
+- Script-driven sound is globally muted during rendering; no audio track is exported.
+- The old Android build process began before these PlayState changes and cannot validate this revision. Do not treat its result as validation for this code.
+
+
+Final Revision 6 validation update:
+- Full project Haxe typecheck passed after the final one-step accumulator implementation, using Android Lime defines and explicit inclusion of PlayState, RenderSongSelectState, RenderSession, and RenderFrameExporter (exit code 0; 96.88 seconds).
+- Standalone RenderSession frame-stepping test passed after the cursor semantics change.
+- The old Android C++ build is still running and was started before Revision 6 source changes; its output is not a valid build result for this revision.
+
+
+## Revision 7 — JS Engine framebuffer capture port and PNG output
+
+Implemented:
+- Replaced the OpenFL `FlxG.stage` redraw/BitmapData capture with the JS Engine-style final framebuffer path: `Application.current.window.readPixels(FlxG.scaleMode.offset + gameSize)` after Flixel's `postDraw` signal. This captures the composed game viewport after camera rendering, including gameplay cameras, HUD, and rendered overlays.
+- PNG encoding now uses `lime.graphics.Image.encode()` and the captured frame is resized to the selected Render Studio output resolution before synchronous file writing.
+- Android output is now rooted at `/sdcard/.PsychEngine/output/<song-id>/`; desktop output is rooted at `.PsychEngine/output/<song-id>/` under the working directory.
+- Each session writes `output-info.txt` with song/mod, resolution, FPS, planned and exported frame counts, source duration, gameplay-file toggle, FPS/OS overlay toggle, PNG naming pattern, and render status.
+- The Show FPS setting now controls `Main.fpsVar` during rendering, so the existing FPS + OS-version display is included in the captured output. Its previous visibility is restored when leaving PlayState.
+- Render metadata is updated to `completed` after the final PNG, or `failed` when capture/export fails.
+
+Validation:
+- `git diff --check` passed after the framebuffer exporter and output-path changes.
+- A full Android-define Haxe typecheck is running against the updated source; record its final exit status after completion.
+- JS Engine reference used: `Application.current.window.readPixels(...)` followed by pixel-buffer encoding; this project keeps PNG sequence output rather than importing the FFmpeg video pipe.
+
+Not yet runtime-verified:
+- Android `Window.readPixels()` framebuffer orientation/content, 4K/HD scaling, and storage permissions still require a live gameplay test on the device.
+- No Android APK build has been started for Revision 7 because the pre-existing Android C++ build (started before Revision 6) is still active. That old build cannot validate these changes.
+- `Use Gameplay file` remains a recorded setting only; Gameplay Recorder/replay input is outside this renderer port.
+- No video file or audio track is produced; the output remains a silent PNG sequence.
+
+
+Revision 7 final validation:
+- `haxe /tmp/check-render.hxml` passed after the final framebuffer capture, output metadata, and FPS/OS overlay changes (exit code 0; 40.68 seconds).
+- `git diff --check` passed.
+- `source.zip` was refreshed in the repository root (606 KB).
+- The pre-existing Android build process (PID 25719) remains active and predates Revision 6; no APK/build success is claimed for Revision 7.
