@@ -8,6 +8,7 @@ class RenderStudioSettings
     public static var frameRate:Int = 60;
     public static var useGameplayFile:Bool = false;
     public static var showFPS:Bool = false;
+    public static var selectedGameplayFile:String = '';
 
     public static inline function getWidth():Int
     {

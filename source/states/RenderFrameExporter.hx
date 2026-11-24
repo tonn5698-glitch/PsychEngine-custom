@@ -60,6 +60,7 @@ class RenderFrameExporter
             'Frames exported: ' + session.frameIndex,
             'Duration: ' + duration + ' ms',
             'Gameplay file input: ' + (session.useGameplayFile ? 'enabled' : 'disabled'),
+            'Gameplay recording: ' + (session.useGameplayFile ? RenderStudioSettings.selectedGameplayFile : '(none)'),
             'FPS and OS overlay: ' + (session.showFPS ? 'enabled' : 'disabled'),
             'Output format: PNG image sequence',
             'Frame pattern: frame_000000.png',

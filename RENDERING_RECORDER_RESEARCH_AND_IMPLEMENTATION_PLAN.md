@@ -1178,3 +1178,21 @@ Revision 7 final validation:
 - `git diff --check` passed.
 - `source.zip` was refreshed in the repository root (606 KB).
 - The pre-existing Android build process (PID 25719) remains active and predates Revision 6; no APK/build success is claimed for Revision 7.
+
+
+
+## Revision 8 — Gameplay Recorder and Rendering Mode replay integration
+
+Implemented:
+- Replaced the recorder placeholder with a working recorder browser: Record new gameplay opens a song selector; saved JSON recordings can be selected for Rendering Mode.
+- Added GameplayRecording.hx, schema version 1. It records canonical logical lane down/up events with song-time millisecond timestamps and sequence ordering, then saves them under /sdcard/.PsychEngine/recordings/ on Android or .PsychEngine/recordings/ on desktop.
+- Recording starts at the actual song start and captures the common PlayState lane input gateway, covering keyboard, controller and touch/mobile lanes. It flushes on song end or PlayState destruction. Duplicate held-state transitions are ignored.
+- Rendering Mode loads the selected replay before launching PlayState, validates schema, song ID and mod directory, and injects the recorded lane events through the same keyPressed/keyReleased gameplay handlers. Physical gameplay lane input is ignored during replay. Replay held-state also drives sustain-note checks.
+- Use Gameplay file now selects this replay path rather than remaining a display-only setting. output-info.txt includes the selected replay path.
+- Recorder browser uses normal UP/DOWN/ENTER controls and is usable without a physical keyboard.
+
+Validation / limits:
+- git diff --check passed after the implementation.
+- The previously running Android Lime/hxcpp build was terminated at the user's request. A separate Haxe typecheck was started briefly and then terminated as well to honor the instruction not to leave Haxe compiling. No Haxe typecheck or APK build success is claimed for this revision.
+- No runtime gameplay recording/replay session has been executed yet. The next direct in-game check is to record one song, return to Gameplay Recorder, select its JSON, then render that same song and verify that hit/miss timing and sustain holds reproduce.
+- This v1 records logical lane down/up input only. It does not yet record arbitrary Lua UI actions, random seeds, checkpoints/desync diagnostics, or guarantee deterministic replay for scripts that use independent randomness or external timing.

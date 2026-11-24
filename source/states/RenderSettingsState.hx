@@ -72,7 +72,7 @@ class RenderSettingsState extends MusicBeatState
         {
             case 0: 'Choose output dimensions: 720p, Full HD, QHD or the 1600×720 mobile canvas.';
             case 1: 'Output frame rate. Every frame is scheduled from the song timeline; frames must not be skipped.';
-            case 2: 'Use a Gameplay Recorder file as the source timeline when that feature is available.';
+            case 2: 'Use a saved Gameplay Recorder input stream. Selected: ' + (RenderStudioSettings.selectedGameplayFile.length > 0 ? RenderStudioSettings.selectedGameplayFile.substr(RenderStudioSettings.selectedGameplayFile.lastIndexOf('/') + 1) : '(none selected)');
             default: 'Draw an FPS and OS-version overlay into the rendered output.';
         };
     }

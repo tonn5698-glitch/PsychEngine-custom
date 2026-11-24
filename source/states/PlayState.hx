@@ -1504,6 +1504,7 @@ class PlayState extends MusicBeatState
 	function startSong():Void
 	{
 		startingSong = false;
+		GameplayRecording.startRequested(SONG.song, Mods.currentModDirectory);
 
 		var renderSession = RenderSession.active;
 		if (renderSession != null)
@@ -2804,6 +2805,7 @@ class PlayState extends MusicBeatState
 	public var transitioning = false;
 	public function endSong()
 	{
+		GameplayRecording.stopRecording();
 		mobileControls.instance.visible = #if !android touchPad.visible = #end false;
 		//Should kill you if you tried to cheat
 		if(!startingSong)
@@ -3158,16 +3160,18 @@ class PlayState extends MusicBeatState
 		}
 	}
 
-	private function keyPressed(key:Int)
+	private function keyPressed(key:Int, fromReplay:Bool = false)
 	{
+		if (GameplayRecording.replaying && !fromReplay) return;
 		if(cpuControlled || paused || inCutscene || key < 0 || key >= playerStrums.length || !generatedMusic || endingSong || boyfriend.stunned) return;
 
 		var ret:Dynamic = callOnScripts('onKeyPressPre', [key]);
 		if(ret == LuaUtils.Function_Stop) return;
+		if (!fromReplay) GameplayRecording.recordLane(Conductor.songPosition, key, true);
 
 		// more accurate hit time for the ratings?
 		var lastTime:Float = Conductor.songPosition;
-		if(Conductor.songPosition >= 0) Conductor.songPosition = FlxG.sound.music.time + Conductor.offset;
+		if(Conductor.songPosition >= 0 && !GameplayRecording.replaying) Conductor.songPosition = FlxG.sound.music.time + Conductor.offset;
 
 		// obtain notes that the player can hit
 		var plrInputNotes:Array<Note> = notes.members.filter(function(n:Note):Bool {
@@ -3236,12 +3240,14 @@ class PlayState extends MusicBeatState
 		if(!controls.controllerMode && key > -1) keyReleased(key);
 	}
 
-	private function keyReleased(key:Int)
+	private function keyReleased(key:Int, fromReplay:Bool = false)
 	{
+		if (GameplayRecording.replaying && !fromReplay) return;
 		if(cpuControlled || !startedCountdown || paused || key < 0 || key >= playerStrums.length) return;
 
 		var ret:Dynamic = callOnScripts('onKeyReleasePre', [key]);
 		if(ret == LuaUtils.Function_Stop) return;
+		if (!fromReplay) GameplayRecording.recordLane(Conductor.songPosition, key, false);
 
 		var spr:StrumNote = playerStrums.members[key];
 		if(spr != null)
@@ -3269,6 +3275,7 @@ class PlayState extends MusicBeatState
 
 	private function onButtonPress(button:TouchButton):Void
 	{
+		if (GameplayRecording.replaying) return;
 		if (button.IDs.filter(id -> id.toString().startsWith("EXTRA")).length > 0)
 			return;
 
@@ -3280,6 +3287,7 @@ class PlayState extends MusicBeatState
 
 	private function onButtonRelease(button:TouchButton):Void
 	{
+		if (GameplayRecording.replaying) return;
 		if (button.IDs.filter(id -> id.toString().startsWith("EXTRA")).length > 0)
 			return;
 
@@ -3296,11 +3304,26 @@ class PlayState extends MusicBeatState
 		var holdArray:Array<Bool> = [];
 		var pressArray:Array<Bool> = [];
 		var releaseArray:Array<Bool> = [];
-		for (key in keysArray)
+		if (GameplayRecording.replaying)
 		{
-			holdArray.push(controls.pressed(key));
-			pressArray.push(controls.justPressed(key));
-			releaseArray.push(controls.justReleased(key));
+			GameplayRecording.pollReplay(Conductor.songPosition,
+				function(lane:Int) keyPressed(lane, true),
+				function(lane:Int) keyReleased(lane, true));
+			for (i in 0...keysArray.length)
+			{
+				holdArray.push(GameplayRecording.isLaneHeld(i));
+				pressArray.push(false);
+				releaseArray.push(false);
+			}
+		}
+		else
+		{
+			for (key in keysArray)
+			{
+				holdArray.push(controls.pressed(key));
+				pressArray.push(controls.justPressed(key));
+				releaseArray.push(controls.justReleased(key));
+			}
 		}
 
 		// TO DO: Find a better way to handle controller inputs, this should work for now
@@ -3746,6 +3769,9 @@ class PlayState extends MusicBeatState
 
 		FlxG.stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
 		FlxG.stage.removeEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
+		GameplayRecording.stopRecording();
+		GameplayRecording.requestRecording = false;
+		GameplayRecording.clearReplay();
 
 		FlxG.camera.setFilters([]);
 

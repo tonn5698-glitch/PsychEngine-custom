@@ -24,6 +24,13 @@ class RenderSongSelectState extends MusicBeatState
     var details:FlxText;
     var help:FlxText;
     var status:FlxText;
+    var recordingMode:Bool = false;
+
+    public function new(recording:Bool = false)
+    {
+        super();
+        recordingMode = recording;
+    }
 
     override function create():Void
     {
@@ -34,7 +41,7 @@ class RenderSongSelectState extends MusicBeatState
         add(bg);
         add(new FlxSprite().makeGraphic(FlxG.width, FlxG.height, 0xD9080B14));
 
-        title = new FlxText(0, 70, FlxG.width, 'SELECT SONG TO RENDER');
+        title = new FlxText(0, 70, FlxG.width, recordingMode ? 'SELECT SONG TO RECORD' : 'SELECT SONG TO RENDER');
         title.setFormat(Paths.font('vcr.ttf'), 30, FlxColor.WHITE, CENTER);
         add(title);
 
@@ -46,7 +53,7 @@ class RenderSongSelectState extends MusicBeatState
         status.setFormat(Paths.font('vcr.ttf'), 16, 0xFF74E0BC, CENTER);
         add(status);
 
-        help = new FlxText(0, FlxG.height - 54, FlxG.width, 'UP / DOWN SELECT     ENTER CREATE SESSION     ESC BACK');
+        help = new FlxText(0, FlxG.height - 54, FlxG.width, 'UP / DOWN SELECT     ENTER ' + (recordingMode ? 'START RECORDING' : 'START RENDER') + '     ESC BACK');
         help.setFormat(Paths.font('vcr.ttf'), 13, FlxColor.WHITE, CENTER);
         add(help);
 
@@ -92,7 +99,7 @@ class RenderSongSelectState extends MusicBeatState
         selected = (selected + songs.length) % songs.length;
         var entry = songs[selected];
         details.text = '< ' + entry.name + ' >\n\n' + (selected + 1) + ' / ' + songs.length;
-        status.text = 'ENTER loads the chart and creates an isolated RenderSession.\nOutput: renders/' + Paths.formatToSongPath(entry.name) + '/';
+        status.text = recordingMode ? 'ENTER starts a normal gameplay session and records lane input.' : 'ENTER loads the chart and creates an isolated RenderSession.\nOutput: .PsychEngine/output/' + Paths.formatToSongPath(entry.name) + '/';
     }
 
     function createSession():Void
@@ -107,7 +114,24 @@ class RenderSongSelectState extends MusicBeatState
             if (chart == null) throw 'Chart loader returned null';
             PlayState.SONG = chart;
             PlayState.isStoryMode = false;
+
+            if (recordingMode)
+            {
+                RenderSession.active = null;
+                GameplayRecording.clearReplay();
+                GameplayRecording.requestRecording = true;
+                details.text = 'Recording gameplay...\n' + entry.name;
+                status.text = 'Input recording will start when the song begins.\nPress ESC in gameplay to leave.';
+                LoadingState.loadAndSwitchState(new PlayState(), true);
+                return;
+            }
+
             RenderSession.active = new RenderSession(songLower, entry.folder);
+            if (RenderSession.active.useGameplayFile)
+            {
+                GameplayRecording.loadReplay(RenderStudioSettings.selectedGameplayFile, songLower, entry.folder);
+            }
+            else GameplayRecording.clearReplay();
             var bpmText = Std.string(chart.bpm);
             status.text = 'SESSION CREATED  |  ' + songLower + '  |  BPM ' + bpmText
                 + '  |  ' + RenderSession.active.outputWidth + 'x' + RenderSession.active.outputHeight
@@ -120,6 +144,8 @@ class RenderSongSelectState extends MusicBeatState
         }
         catch (e:Dynamic)
         {
+            RenderSession.active = null;
+            GameplayRecording.clearReplay();
             status.text = 'Could not load chart: ' + Std.string(e);
         }
     }
@@ -130,6 +156,6 @@ class RenderSongSelectState extends MusicBeatState
         if (controls.UI_UP_P && songs.length > 0) { selected = (selected + songs.length - 1) % songs.length; refresh(); }
         if (controls.UI_DOWN_P && songs.length > 0) { selected = (selected + 1) % songs.length; refresh(); }
         if (controls.ACCEPT) createSession();
-        if (controls.BACK) { RenderSession.active = null; MusicBeatState.switchState(new RenderWorkspaceState(false)); }
+        if (controls.BACK) { RenderSession.active = null; if (recordingMode) GameplayRecording.requestRecording = false; if (recordingMode) MusicBeatState.switchState(new GameplayRecorderState()); else MusicBeatState.switchState(new RenderWorkspaceState(false)); }
     }
 }
