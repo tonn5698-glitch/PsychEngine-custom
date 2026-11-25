@@ -36,6 +36,7 @@ class GameplayRecorderState extends MusicBeatState
         add(status);
 
         refresh();
+        addTouchPad('LEFT_FULL', 'A_B');
         super.create();
     }
 

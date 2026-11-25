@@ -294,6 +294,18 @@ class FreeplayState extends MusicBeatState
 		return (!leWeek.startUnlocked && leWeek.weekBefore.length > 0 && (!StoryMenuState.weekCompleted.exists(leWeek.weekBefore) || !StoryMenuState.weekCompleted.get(leWeek.weekBefore)));
 	}
 
+	public function openRenderStudioFromChangers():Void
+	{
+		if (songs == null || songs.length == 0) return;
+		var entry = songs[curSelected];
+		RenderStudioSettings.preferredSong = entry.songName;
+		RenderStudioSettings.preferredFolder = entry.folder;
+		RenderStudioSettings.preferredDifficulty = curDifficulty;
+		RenderStudioSettings.hasPreferredSong = true;
+		persistentUpdate = false;
+		MusicBeatState.switchState(new RenderState());
+	}
+
 	var instPlaying:Int = -1;
 	public static var vocals:FlxSound = null;
 	public static var opponentVocals:FlxSound = null;

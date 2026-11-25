@@ -59,6 +59,7 @@ class RenderSongSelectState extends MusicBeatState
 
         collectSongs();
         refresh();
+        addTouchPad('LEFT_FULL', 'A_B');
         super.create();
     }
 
@@ -86,6 +87,18 @@ class RenderSongSelectState extends MusicBeatState
         }
         WeekData.setDirectoryFromWeek();
         songs.sort(function(a, b) return Reflect.compare(a.name.toLowerCase(), b.name.toLowerCase()));
+        if (RenderStudioSettings.hasPreferredSong)
+        {
+            for (i in 0...songs.length)
+            {
+                if (songs[i].folder == RenderStudioSettings.preferredFolder
+                    && Paths.formatToSongPath(songs[i].name) == Paths.formatToSongPath(RenderStudioSettings.preferredSong))
+                {
+                    selected = i;
+                    break;
+                }
+            }
+        }
     }
 
     function refresh():Void
@@ -110,8 +123,15 @@ class RenderSongSelectState extends MusicBeatState
         var songLower = Paths.formatToSongPath(entry.name);
         try
         {
-            var chart = Song.loadFromJson(Highscore.formatSong(songLower, 0), songLower);
+            PlayState.storyWeek = entry.week;
+            Difficulty.loadFromWeek();
+            var renderDifficulty:Int = RenderStudioSettings.hasPreferredSong ? RenderStudioSettings.preferredDifficulty : 0;
+            if (Difficulty.list.length > 0)
+                renderDifficulty = Std.int(Math.max(0, Math.min(renderDifficulty, Difficulty.list.length - 1)));
+            else renderDifficulty = 0;
+            var chart = Song.loadFromJson(Highscore.formatSong(songLower, renderDifficulty), songLower);
             if (chart == null) throw 'Chart loader returned null';
+            RenderStudioSettings.hasPreferredSong = false;
             PlayState.SONG = chart;
             PlayState.isStoryMode = false;
 

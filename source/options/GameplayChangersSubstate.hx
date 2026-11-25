@@ -2,6 +2,7 @@ package options;
 
 import objects.AttachedText;
 import objects.CheckboxThingie;
+import states.FreeplayState;
 
 import options.Option.OptionType;
 
@@ -69,6 +70,10 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 		optionsArray.push(new GameplayOption('Instakill on Miss', 'instakill', BOOL, false));
 		optionsArray.push(new GameplayOption('Practice Mode', 'practice', BOOL, false));
 		optionsArray.push(new GameplayOption('Botplay', 'botplay', BOOL, false));
+
+		var renderStudioOption = new GameplayOption('Enter Render Studio', 'botplay', BOOL, false);
+		renderStudioOption.isAction = true;
+		optionsArray.push(renderStudioOption);
 	}
 
 	public function getOptionByName(name:String)
@@ -112,7 +117,13 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 			optionText.targetY = i;
 			grpOptions.add(optionText);
 
-			if(optionsArray[i].type == BOOL)
+			if (optionsArray[i].isAction)
+			{
+				optionText.x += 60;
+				optionText.startPosition.x += 60;
+				optionText.snapToPosition();
+			}
+			else if(optionsArray[i].type == BOOL)
 			{
 				optionText.x += 60;
 				optionText.startPosition.x += 60;
@@ -134,7 +145,7 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 				grpTexts.add(valueText);
 				optionsArray[i].setChild(valueText);
 			}
-			updateTextFrom(optionsArray[i]);
+			if (!optionsArray[i].isAction) updateTextFrom(optionsArray[i]);
 		}
 
 		addTouchPad('LEFT_FULL', 'A_B_C');
@@ -170,6 +181,12 @@ class GameplayChangersSubstate extends MusicBeatSubstate
 			{
 				if(controls.ACCEPT)
 				{
+					if (curOption.isAction)
+					{
+						var freeplay:FreeplayState = cast FlxG.state;
+						if (freeplay != null) freeplay.openRenderStudioFromChangers();
+						return;
+					}
 					FlxG.sound.play(Paths.sound('scrollMenu'));
 					curOption.setValue((curOption.getValue() == true) ? false : true);
 					curOption.change();
@@ -365,6 +382,7 @@ class GameplayOption
 	public var text(get, set):String;
 	public var onChange:Void->Void = null; //Pressed enter (on Bool type options) or pressed/held left/right (on other types)
 	public var type:OptionType = BOOL;
+	public var isAction:Bool = false;
 
 	public var showBoyfriend:Bool = false;
 	public var scrollSpeed:Float = 50; //Only works on int/float, defines how fast it scrolls per second while holding left/right

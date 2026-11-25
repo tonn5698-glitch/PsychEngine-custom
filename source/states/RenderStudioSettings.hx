@@ -9,6 +9,10 @@ class RenderStudioSettings
     public static var useGameplayFile:Bool = false;
     public static var showFPS:Bool = false;
     public static var selectedGameplayFile:String = '';
+    public static var preferredSong:String = '';
+    public static var preferredFolder:String = '';
+    public static var preferredDifficulty:Int = 0;
+    public static var hasPreferredSong:Bool = false;
 
     public static inline function getWidth():Int
     {

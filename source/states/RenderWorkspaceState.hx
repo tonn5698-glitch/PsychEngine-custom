@@ -44,6 +44,7 @@ class RenderWorkspaceState extends MusicBeatState
         hint.setFormat(Paths.font('vcr.ttf'), 14, 0xFFDCE4F5, CENTER);
         add(hint);
         refresh();
+        addTouchPad('LEFT_FULL', 'A_B');
         super.create();
     }
 

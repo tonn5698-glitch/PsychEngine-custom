@@ -38,6 +38,7 @@ class RenderSettingsState extends MusicBeatState
         description = addText(80, 430, '', 15, 0xFFADB8D0, false, FlxG.width - 160);
         addText(0, FlxG.height - 48, 'UP / DOWN SELECT     LEFT / RIGHT CHANGE     ENTER TOGGLE     ESC BACK', 12, 0xFFE1E7F5, true, FlxG.width, CENTER);
         updateValues();
+        addTouchPad('LEFT_FULL', 'A_B');
         super.create();
     }
 
