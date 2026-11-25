@@ -293,6 +293,8 @@ class PlayState extends MusicBeatState
 	var renderPreviousDrawFramerate:Int = 60;
 	var renderPreviousMaxAccumulation:Float = 0;
 	var renderStepReady:Bool = false;
+	var renderFastForwardCapped:Bool = false;
+	static inline var FAST_FORWARD_BATCH:Int = 8;
 	var renderCompleteText:FlxText;
 
 	// Biến local của create() nhưng cần dùng lại ở các phase sau → đưa thành field
@@ -1525,11 +1527,26 @@ class PlayState extends MusicBeatState
 			}
 
 			renderSession.configureDurationMs(songLength);
-			RenderFrameExporter.writeOutputInfo(renderSession, 'rendering');
+			var renderBlocked:String = renderSession.failed ? renderSession.errorMessage : null;
+			if (renderBlocked == null && renderSession.completed)
+				renderBlocked = 'render đã hoàn thành trước đó';
+			if (renderBlocked == null && renderSession.startFrame > 0)
+				renderBlocked = RenderFrameExporter.checkResumeDuration(renderSession);
+			if (renderBlocked == null)
+			{
+				RenderFrameExporter.writeOutputInfo(renderSession, renderSession.startFrame > 0 ? 'continued from frame ' + renderSession.startFrame : 'rendering');
+				renderSession.isRendering = renderSession.totalFrames > 0;
+				if (!renderSession.isRendering)
+					throw 'Render session has no frames to export';
+			}
+			else
+			{
+				renderSession.isRendering = false;
+				renderSession.failed = true;
+				renderSession.errorMessage = renderBlocked;
+				showRenderMessage('RENDER BLOCKED  |  ' + renderBlocked + '  |  ESC TO RETURN', FlxColor.RED);
+			}
 			renderSession.audioEnabled = false;
-			renderSession.isRendering = renderSession.totalFrames > 0;
-			if (!renderSession.isRendering)
-				throw 'Render session has no frames to export';
 
 			stagesFunc(function(stage:BaseStage) stage.startSong());
 			setOnScripts('songLength', songLength);
@@ -3667,6 +3684,12 @@ class PlayState extends MusicBeatState
 
 		// FlxGame's accumulator is capped to one fixed step, so no catch-up updates
 		// can occur before a draw. Mark this draw as having one fresh simulation step.
+		if (session.isFastForward())
+		{
+			Conductor.songPosition = session.timelinePositionUs / 1000.0;
+			session.advanceFrame();
+			return;
+		}
 		renderStepReady = true;
 		Conductor.songPosition = session.timelinePositionUs / 1000.0;
 	}
@@ -3674,7 +3697,24 @@ class PlayState extends MusicBeatState
 	function onRenderPostDraw():Void
 	{
 		var session = RenderSession.active;
-		if (!renderModeActive || session == null || !session.isRendering || !creationComplete || !renderStepReady || FlxG.state != this)
+		if (!renderModeActive || session == null || !session.isRendering || !creationComplete || FlxG.state != this)
+			return;
+		if (renderFastForwardCapped && !session.isFastForward())
+		{
+			renderFastForwardCapped = false;
+			@:privateAccess
+			{
+				FlxG.game._maxAccumulation = 1000.0 / session.frameRate;
+				FlxG.game._accumulator = 1000.0 / session.frameRate;
+			}
+			return;
+		}
+		if (session.isFastForward())
+		{
+			fastForwardBatch(session);
+			return;
+		}
+		if (!renderStepReady)
 			return;
 		renderStepReady = false;
 
@@ -3684,6 +3724,7 @@ class PlayState extends MusicBeatState
 			if (!session.advanceFrame())
 			{
 				session.isRendering = false;
+				RenderFrameExporter.flush();
 				RenderFrameExporter.writeOutputInfo(session, 'completed');
 				if (renderCompleteText == null)
 				{
@@ -3715,6 +3756,38 @@ class PlayState extends MusicBeatState
 				add(renderCompleteText);
 			}
 		}
+	}
+
+	/**
+	 * Runs the next FAST_FORWARD_BATCH simulation steps in one draw. The accumulator is clamped
+	 * to this cap every frame, so exactly `batch` steps run and none overshoot startFrame.
+	 */
+	function fastForwardBatch(session:RenderSession):Void
+	{
+		var stepMs:Float = @:privateAccess FlxG.game._stepMS;
+		var remaining = session.startFrame - session.frameIndex;
+		var batch = remaining < FAST_FORWARD_BATCH ? remaining : FAST_FORWARD_BATCH;
+		var cap = (batch + 0.5) * stepMs;
+		@:privateAccess
+		{
+			FlxG.game._maxAccumulation = cap;
+			FlxG.game._accumulator = cap;
+		}
+		renderFastForwardCapped = true;
+	}
+
+	function showRenderMessage(message:String, color:Int):Void
+	{
+		if (renderCompleteText == null)
+		{
+			renderCompleteText = new FlxText(0, FlxG.height - 64, FlxG.width, message, 14);
+			renderCompleteText.setFormat(Paths.font('vcr.ttf'), 14, color, CENTER,
+				FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			renderCompleteText.scrollFactor.set();
+			renderCompleteText.cameras = [camHUD];
+			add(renderCompleteText);
+		}
+		else renderCompleteText.text = message;
 	}
 
 	override function destroy() {

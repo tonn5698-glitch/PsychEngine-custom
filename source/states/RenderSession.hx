@@ -11,6 +11,9 @@ class RenderSession
     public var frameRate:Int;
     public var useGameplayFile:Bool;
     public var showFPS:Bool;
+    public var exportWorkers:Int;
+    /** First frame that is exported. Frames before it are simulated without writing PNG files. */
+    public var startFrame:Int = 0;
     /** Number of frames already advanced. */
     public var frameIndex:Int = 0;
     /** Total output frames; zero means duration has not been configured. */
@@ -24,6 +27,7 @@ class RenderSession
     public var failed:Bool = false;
     public var errorMessage:String = '';
     public var audioEnabled:Bool = false;
+    public var outputRoot:String;
     public var outputDirectory:String;
 
     public function new(song:String, mod:String = '')
@@ -36,8 +40,21 @@ class RenderSession
         if (frameRate < 1) frameRate = 60;
         useGameplayFile = RenderStudioSettings.useGameplayFile;
         showFPS = RenderStudioSettings.showFPS;
-        var outputRoot:String = #if android mobile.backend.StorageUtil.getExternalStorageDirectory() + 'output/' #elseif sys Sys.getCwd() + '.PsychEngine/output/' #else 'output/' #end;
+        exportWorkers = RenderStudioSettings.exportWorkers;
+        outputRoot = #if android mobile.backend.StorageUtil.getExternalStorageDirectory() + 'output/' #elseif sys Sys.getCwd() + '.PsychEngine/output/' #else 'output/' #end;
         outputDirectory = outputRoot + songId + '/';
+    }
+
+    /** Puts a new render in its own folder so an earlier render is never overwritten. */
+    public function useFreshFolder():Void
+    {
+        outputDirectory = outputRoot + songId + '-' + Std.string(Std.int(Date.now().getTime())) + '/';
+    }
+
+    /** True while frames before startFrame are being simulated silently. */
+    public function isFastForward():Bool
+    {
+        return frameIndex < startFrame;
     }
 
     /** Calculates the exact timestamp for a frame without accumulating rounding drift. */
@@ -60,9 +77,14 @@ class RenderSession
         this.durationMs = safeDuration;
         totalFrames = Std.int(Math.ceil(safeDuration * frameRate / 1000.0));
         reset();
+        if (totalFrames > 0 && startFrame >= totalFrames)
+        {
+            completed = true;
+            isRendering = false;
+        }
     }
 
-    /** Moves the cursor to the next frame after the current frame has been exported. */
+    /** Moves the cursor to the next frame after the current frame has been exported or simulated. */
     public function advanceFrame():Bool
     {
         if (totalFrames <= 0 || frameIndex >= totalFrames) return false;

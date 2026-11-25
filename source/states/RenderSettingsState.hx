@@ -7,13 +7,26 @@ import flixel.text.FlxText;
 
 class RenderSettingsState extends MusicBeatState
 {
-    static var resolutions:Array<String> = ["1280 x 720", "1920 x 1080", "2560 x 1440", "1600 x 720 (Mobile)"];
-    static var frameRates:Array<Int> = [24, 30, 60, 120];
+    /** Keeps the cursor row when returning from the resolution picker. */
+    public static var lastSelected:Int = 0;
+
+    static inline var ROW_RESOLUTION:Int = 0;
+    static inline var ROW_FPS:Int = 1;
+    static inline var ROW_WORKERS:Int = 2;
+    static inline var ROW_GAMEPLAY:Int = 3;
+    static inline var ROW_SHOW_FPS:Int = 4;
+
+    /** Hold-to-repeat timing for LEFT/RIGHT on numeric rows. */
+    static inline var REPEAT_DELAY:Float = 0.4;
+    static inline var REPEAT_INTERVAL:Float = 0.05;
 
     var selected:Int = 0;
     var rows:Array<FlxText> = [];
     var values:Array<FlxText> = [];
     var description:FlxText;
+    var holdDir:Int = 0;
+    var holdTime:Float = 0;
+    var repeatTime:Float = 0;
 
     override function create():Void
     {
@@ -30,13 +43,18 @@ class RenderSettingsState extends MusicBeatState
         addText(80, 112, 'QUALITY OUTPUT', 18, 0xFF9B8CFF, true, 500);
         addRow('Resolution', 150);
         addRow('Frame Rate (FPS)', 198);
+        addRow('Export threads (PNG)', 246);
 
-        addText(80, 270, 'GAMEPLAY', 18, 0xFF9B8CFF, true, 500);
-        addRow('Use Gameplay file', 308);
-        addRow('Show FPS overlay', 356);
+        addText(80, 300, 'GAMEPLAY', 18, 0xFF9B8CFF, true, 500);
+        addRow('Use Gameplay file', 338);
+        addRow('Show FPS overlay', 386);
 
-        description = addText(80, 430, '', 15, 0xFFADB8D0, false, FlxG.width - 160);
-        addText(0, FlxG.height - 48, 'UP / DOWN SELECT     LEFT / RIGHT CHANGE     ENTER TOGGLE     ESC BACK', 12, 0xFFE1E7F5, true, FlxG.width, CENTER);
+        description = addText(80, 450, '', 15, 0xFFADB8D0, false, FlxG.width - 160);
+        addText(0, FlxG.height - 48, 'UP / DOWN SELECT     LEFT / RIGHT CHANGE     ENTER OPEN / TOGGLE     ESC BACK', 12, 0xFFE1E7F5, true, FlxG.width, CENTER);
+
+        RenderStudioSettings.syncEngineSize();
+        RenderStudioSettings.resolutionPreset = RenderStudioSettings.compatiblePreset(RenderStudioSettings.resolutionPreset);
+        selected = lastSelected;
         updateValues();
         addTouchPad('LEFT_FULL', 'A_B');
         super.create();
@@ -57,25 +75,63 @@ class RenderSettingsState extends MusicBeatState
         return t;
     }
 
+    function clampInt(value:Int, min:Int, max:Int):Int
+    {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+
     function updateValues():Void
     {
-        values[0].text = resolutions[RenderStudioSettings.resolutionPreset];
-        values[1].text = Std.string(RenderStudioSettings.frameRate) + ' FPS';
-        values[2].text = RenderStudioSettings.useGameplayFile ? '[✓] ENABLED' : '[ ] DISABLED';
-        values[3].text = RenderStudioSettings.showFPS ? '[✓] ENABLED' : '[ ] DISABLED';
+        lastSelected = selected;
+        var preset = RenderStudioSettings.RESOLUTIONS[RenderStudioSettings.clampPreset(RenderStudioSettings.resolutionPreset)];
+        values[ROW_RESOLUTION].text = preset.label + '   ' + preset.width + ' x ' + preset.height + (RenderStudioSettings.isLocked(RenderStudioSettings.resolutionPreset) ? '   (locked)' : '');
+        values[ROW_FPS].text = Std.string(RenderStudioSettings.frameRate) + ' FPS';
+        values[ROW_WORKERS].text = Std.string(RenderStudioSettings.exportWorkers) + (RenderStudioSettings.exportWorkers == 1 ? ' thread' : ' threads');
+        values[ROW_GAMEPLAY].text = RenderStudioSettings.useGameplayFile ? '[✓] ENABLED' : '[ ] DISABLED';
+        values[ROW_SHOW_FPS].text = RenderStudioSettings.showFPS ? '[✓] ENABLED' : '[ ] DISABLED';
+
         for (i in 0...rows.length)
         {
             rows[i].alpha = i == selected ? 1 : 0.62;
             values[i].alpha = i == selected ? 1 : 0.62;
             rows[i].color = i == selected ? 0xFFFFFFFF : 0xFFADB8D0;
         }
+
         description.text = switch (selected)
         {
-            case 0: 'Choose output dimensions: 720p, Full HD, QHD or the 1600×720 mobile canvas.';
-            case 1: 'Output frame rate. Every frame is scheduled from the song timeline; frames must not be skipped.';
-            case 2: 'Use a saved Gameplay Recorder input stream. Selected: ' + (RenderStudioSettings.selectedGameplayFile.length > 0 ? RenderStudioSettings.selectedGameplayFile.substr(RenderStudioSettings.selectedGameplayFile.lastIndexOf('/') + 1) : '(none selected)');
+            case 0: 'ENTER opens the full list (720p to 4K). LEFT / RIGHT steps through it.';
+            case 1: 'Output frame rate, 24 to 120. Hold LEFT / RIGHT to scroll faster.';
+            case 2: 'Background threads that resize and encode PNG frames. More threads use more RAM.';
+            case 3: 'Use a saved Gameplay Recorder input stream. Selected: ' + (RenderStudioSettings.selectedGameplayFile.length > 0 ? RenderStudioSettings.selectedGameplayFile.substr(RenderStudioSettings.selectedGameplayFile.lastIndexOf('/') + 1) : '(none selected)');
             default: 'Draw an FPS and OS-version overlay into the rendered output.';
         };
+    }
+
+    function setFps(value:Int):Void
+    {
+        RenderStudioSettings.frameRate = clampInt(value, RenderStudioSettings.FPS_MIN, RenderStudioSettings.FPS_MAX);
+    }
+
+    function setWorkers(value:Int):Void
+    {
+        RenderStudioSettings.exportWorkers = clampInt(value, RenderStudioSettings.WORKERS_MIN, RenderStudioSettings.WORKERS_MAX);
+    }
+
+    function openResolutionPicker():Void
+    {
+        var labels:Array<String> = [];
+        for (i in 0...RenderStudioSettings.RESOLUTIONS.length)
+        {
+            var r = RenderStudioSettings.RESOLUTIONS[i];
+            labels.push(r.label + '   ' + r.width + ' x ' + r.height + (RenderStudioSettings.isLocked(i) ? '   (locked)' : ''));
+        }
+        var current = RenderStudioSettings.clampPreset(RenderStudioSettings.resolutionPreset);
+        MusicBeatState.switchState(new RenderPickerState('OUTPUT RESOLUTION', labels, current, function(idx:Int)
+        {
+            if (!RenderStudioSettings.isLocked(idx)) RenderStudioSettings.resolutionPreset = RenderStudioSettings.clampPreset(idx);
+        }));
     }
 
     function changeValue(dir:Int):Void
@@ -83,16 +139,64 @@ class RenderSettingsState extends MusicBeatState
         switch (selected)
         {
             case 0:
-                RenderStudioSettings.resolutionPreset = (RenderStudioSettings.resolutionPreset + (dir >= 0 ? 1 : resolutions.length - 1)) % resolutions.length;
-            case 1:
-                var idx = frameRates.indexOf(RenderStudioSettings.frameRate);
-                if (idx < 0) idx = 2;
-                idx = (idx + (dir >= 0 ? 1 : frameRates.length - 1)) % frameRates.length;
-                RenderStudioSettings.frameRate = frameRates[idx];
-            case 2: RenderStudioSettings.useGameplayFile = !RenderStudioSettings.useGameplayFile;
-            case 3: RenderStudioSettings.showFPS = !RenderStudioSettings.showFPS;
+                var len = RenderStudioSettings.RESOLUTIONS.length;
+                var idx = RenderStudioSettings.clampPreset(RenderStudioSettings.resolutionPreset);
+                for (_ in 0...len)
+                {
+                    idx = (idx + dir + len) % len;
+                    if (!RenderStudioSettings.isLocked(idx)) break;
+                }
+                RenderStudioSettings.resolutionPreset = idx;
+            case 1: setFps(RenderStudioSettings.frameRate + dir);
+            case 2: setWorkers(RenderStudioSettings.exportWorkers + dir);
+            case 3: RenderStudioSettings.useGameplayFile = !RenderStudioSettings.useGameplayFile;
+            case 4: RenderStudioSettings.showFPS = !RenderStudioSettings.showFPS;
         }
         updateValues();
+    }
+
+    function isHoldRow():Bool
+    {
+        return selected == ROW_FPS || selected == ROW_WORKERS;
+    }
+
+    /** LEFT / RIGHT: one step on press, then repeats after a short delay while held. */
+    function updateHold(elapsed:Float):Void
+    {
+        if (!isHoldRow())
+        {
+            holdDir = 0;
+            return;
+        }
+
+        if (controls.UI_LEFT_P || controls.UI_RIGHT_P)
+        {
+            var dir = controls.UI_LEFT_P ? -1 : 1;
+            holdDir = dir;
+            holdTime = 0;
+            repeatTime = 0;
+            changeValue(dir);
+            return;
+        }
+
+        var held = controls.UI_LEFT ? -1 : (controls.UI_RIGHT ? 1 : 0);
+        if (held == 0 || held != holdDir)
+        {
+            holdDir = held;
+            holdTime = 0;
+            repeatTime = 0;
+            return;
+        }
+
+        holdTime += elapsed;
+        if (holdTime < REPEAT_DELAY) return;
+
+        repeatTime += elapsed;
+        while (repeatTime >= REPEAT_INTERVAL)
+        {
+            repeatTime -= REPEAT_INTERVAL;
+            changeValue(held);
+        }
     }
 
     override function update(elapsed:Float):Void
@@ -100,8 +204,22 @@ class RenderSettingsState extends MusicBeatState
         super.update(elapsed);
         if (controls.UI_UP_P) { selected = (selected + rows.length - 1) % rows.length; updateValues(); }
         if (controls.UI_DOWN_P) { selected = (selected + 1) % rows.length; updateValues(); }
-        if (controls.UI_LEFT_P) changeValue(-1);
-        if (controls.UI_RIGHT_P || controls.ACCEPT) changeValue(1);
+
+        if (controls.ACCEPT)
+        {
+            if (selected == ROW_RESOLUTION) openResolutionPicker();
+            else changeValue(1);
+            return;
+        }
+
+        if (isHoldRow())
+            updateHold(elapsed);
+        else
+        {
+            if (controls.UI_LEFT_P) changeValue(-1);
+            if (controls.UI_RIGHT_P) changeValue(1);
+        }
+
         if (controls.BACK) MusicBeatState.switchState(new RenderWorkspaceState(false));
     }
 }
