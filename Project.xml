@@ -203,4 +203,5 @@
 	<!-- Android overrides: PsychAndroid.java + AndroidManifest (queries) -->
 	<templatePath name="psych_templates" />
 	<android permission="android.permission.POST_NOTIFICATIONS" />
+	<android permission="android.permission.MANAGE_EXTERNAL_STORAGE" />
 </project>
